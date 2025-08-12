@@ -1,103 +1,137 @@
-import Image from "next/image";
+"use client";
+import React from "react";
+import { motion } from "framer-motion";
+import {
+  BookOpen,
+  Users,
+  PlayCircle,
+  Target,
+  TrendingUp,
+  MessageSquare,
+  Clock,
+  Globe2,
+} from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  RadialBarChart,
+  RadialBar,
+  Legend,
+} from "recharts";
+import HomeCardHeader from "@/components/Home/HomeCardHeader/HomeCardHeader";
+import HomeCard from "@/components/Home/HomeCard/HomeCard";
+import HomeStatCard from "@/components/Home/HomeStatCard/HomeStatCard";
+import HomeTopCourses from "@/components/Home/HomeTopCourses/HomeTopCourses";
+import HomeSessions from "@/components/Home/HomeSessions/HomeSessions";
+import HomeSkills from "@/components/Home/HomeSkills/HomeSkills";
 
-export default function Home() {
+// ---- Mock Data (replace with real API data) ----
+
+
+const skillsData = [
+  { skill: "Listening", score: 86 },
+  { skill: "Speaking", score: 74 },
+  { skill: "Reading", score: 91 },
+  { skill: "Writing", score: 68 },
+];
+
+
+const completion = [
+  { name: "Completed", value: 72, fill: "#02AAA0" },
+  { name: "Remaining", value: 28, fill: "#E5E7EB" },
+];
+
+const topCourses = [
+  {
+    id: 1,
+    title: "Arabic for Beginners — Letters & Sounds",
+    dialect: "MSA",
+    progress: 82,
+    students: 1240,
+  },
+  {
+    id: 2,
+    title: "Egyptian Arabic: Daily Phrases (العامية)",
+    dialect: "EGY",
+    progress: 64,
+    students: 980,
+  },
+  {
+    id: 3,
+    title: "MSA Pronunciation & Tajwīd Basics",
+    dialect: "MSA",
+    progress: 47,
+    students: 720,
+  },
+];
+
+const recentActivity = [
+  { id: 1, user: "Omar Ali", action: "completed lesson", meta: "MSA Letters — ج ح خ", time: "2m" },
+  { id: 2, user: "Mona Samir", action: "joined course", meta: "Egyptian Daily Phrases", time: "15m" },
+  { id: 3, user: "Yousef Adel", action: "posted a question", meta: "How to pronounce ق?", time: "32m" },
+  { id: 4, user: "Lina Ahmed", action: "earned badge", meta: "7-day streak", time: "1h" },
+];
+
+// Neutral color palette for charts (Tailwind-like)
+const chartPalette = ["#0EA5E9", "#22C55E", "#F59E0B", "#6366F1", "#EF4444", "#14B8A6"]; // teal-ish and friends
+
+
+export default function Page() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen ">
+      {/* Header */}
+      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">Arabic Learning Dashboard</h1>
+          <p className="text-slate-500 mt-1">Monitor learner progress across Modern Standard Arabic (الفصحى) and Egyptian Arabic (العامية).</p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Search + Filters */}
+        <div className="flex flex-col sm:flex-row items-stretch gap-3">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search..."
+              className="w-full sm:w-72 rounded-2xl border border-slate-200 bg-white/80 px-4 py-2.5 shadow-sm outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+            />
+            <span className="absolute right-3 top-2.5 text-slate-400 text-sm">⌘K</span>
+          </div>
+          <select className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-2.5 shadow-sm outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-100">
+            <option>Last 7 days</option>
+            <option>Last 30 days</option>
+            <option>Last 90 days</option>
+          </select>
+        </div>
+      </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        <HomeStatCard icon={Users}  color={"bg-teal-400"} title="Total Learners" value="3,482" delta="+6.2%" alt="vs last week" />
+        <HomeStatCard icon={BookOpen} color={"bg-fuchsia-400"} title="Active Courses" value="24" delta="+2" alt="new this week" />
+        <HomeStatCard icon={PlayCircle} color={"bg-amber-600"} title="Lessons Completed" value="18,905" delta="+1,120" alt="last 7 days" />
+        <HomeStatCard icon={Target} color={"bg-emerald-400"} title="Avg. Completion" value="72%" delta="+4%" alt="course avg" highlight />
+      </div>
+      {/* Charts Row */}
+      <HomeSessions />
+      {/* Skills & Completion Row */}
+      <HomeSkills chartPalette={chartPalette} completion={completion} skillsData={skillsData} />
+      {/* Top Courses */}
+      <HomeTopCourses recentActivity={recentActivity} topCourses={topCourses}/>
+
     </div>
   );
 }
+
+// ---- UI Bits ----
+
+
+
