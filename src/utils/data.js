@@ -1,3 +1,4 @@
+// utils/data.js
 export const courses = [
   {
     id: 1,
@@ -102,6 +103,7 @@ export const courses = [
     ],
   },
 ];
+
 
 export const teachers = [
   {

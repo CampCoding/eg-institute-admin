@@ -83,9 +83,7 @@ export default function AddUnitPage() {
     router.push(`/courses/${course.id}`);
   };
 
-  function handleSubmit() {
-    console.log("Unit Deleted");
-  }
+  
 
   return (
     <div className="min-h-screen">

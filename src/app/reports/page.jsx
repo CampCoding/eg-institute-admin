@@ -197,7 +197,7 @@ function useUsersReport(events) {
 // --- Page
 export default function Page() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState(1);
+  const [activeTab, setActiveTab] = useState(2);
   const [q, setQ] = useState("");
 
   // Sort newest first for timeline

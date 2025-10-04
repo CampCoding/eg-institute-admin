@@ -6,7 +6,7 @@ import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { Loader2, Save, Plus, X, ArrowLeft, Upload } from "lucide-react";
 import { teachers } from "@/utils/data";
 
-const LEVELS = ["Beginner", "Intermediate", "Advanced"];
+const LEVELS = ["Beginner", "Intermediate", "Advanced", "All Levels"];
 const GRADIENTS = [
   "from-indigo-500 via-sky-500 to-emerald-500",
   "from-fuchsia-500 via-pink-500 to-amber-400",
@@ -21,26 +21,73 @@ export default function AddCoursePage() {
   const [form, setForm] = useState({
     title: "",
     description: "",
+    longDescription: "",
     level: LEVELS[0],
-    duration: "4h 30m",
+    duration: "12 weeks",
     lessons: 12,
-    teacher: "Unknown",
-    price: "$0",
+    teacher: teachers?.[0]?.name || "Unknown",
+    price: "$149",
     video: "",
     poster: "",
     color: GRADIENTS[0],
   });
 
+  // Overview “What you’ll learn” + feature cards
+  const [learnItems, setLearnItems] = useState([
+    "Read and write Arabic script fluently",
+    "Engage in everyday Egyptian conversations",
+  ]);
+  const [features, setFeatures] = useState([
+    { title: "Interactive Dialogues", subtitle: "Real-life conversations" },
+    { title: "Audio Lessons", subtitle: "Native pronunciation" },
+    { title: "Writing Practice", subtitle: "Script mastery" },
+  ]);
+
+  // Free trials list
+  const [freeTrials, setFreeTrials] = useState([
+    { id: "ft-1", title: "Egyptian Arabic Basics - Free Trial", questions: 20, duration: "25 min", type: "MCQ", isFree: true },
+  ]);
+
+  // Units / Chapters (used for Course Content)
   const [chapters, setChapters] = useState([{ title: "Introduction", duration: "05:00" }]);
+
   const [saving, setSaving] = useState(false);
   const valid = useMemo(() => !!form.title && !!form.description, [form]);
 
   const onChange = (key, val) => setForm((s) => ({ ...s, [key]: val }));
 
+  const addLearn = () => setLearnItems((s) => [...s, ""]);
+  const updateLearn = (i, v) =>
+    setLearnItems((s) => s.map((x, idx) => (idx === i ? v : x)));
+  const removeLearn = (i) => setLearnItems((s) => s.filter((_, idx) => idx !== i));
+
+  const addFeature = () => setFeatures((s) => [...s, { title: "", subtitle: "" }]);
+  const updateFeature = (i, key, v) =>
+    setFeatures((s) => s.map((f, idx) => (idx === i ? { ...f, [key]: v } : f)));
+  const removeFeature = (i) => setFeatures((s) => s.filter((_, idx) => idx !== i));
+
+  const addTrial = () =>
+    setFreeTrials((s) => [
+      ...s,
+      { id: `ft-${Date.now()}`, title: "", questions: 0, duration: "10 min", type: "MCQ", isFree: true },
+    ]);
+  const updateTrial = (i, key, v) =>
+    setFreeTrials((s) => s.map((t, idx) => (idx === i ? { ...t, [key]: v } : t)));
+  const removeTrial = (i) => setFreeTrials((s) => s.filter((_, idx) => idx !== i));
+
   const addChapter = () => setChapters((s) => [...s, { title: "", duration: "00:00" }]);
   const removeChapter = (i) => setChapters((s) => s.filter((_, idx) => idx !== i));
   const updateChapter = (i, key, val) =>
     setChapters((s) => s.map((c, idx) => (idx === i ? { ...c, [key]: val } : c)));
+
+  const [instructor, setInstructor] = useState({
+    name: teachers?.[0]?.name || "Ahmed Hassan",
+    role: "Native Egyptian Arabic Teacher & Cultural Expert",
+    bio: "",
+    avatarBg: "#0ea5a6",
+  });
+
+  const [reviews] = useState([]); // optional to pre-seed
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,6 +97,21 @@ export default function AddCoursePage() {
     const payload = {
       ...form,
       id: `course-${Date.now()}`,
+      overview: {
+        whatYouWillLearn: learnItems.filter(Boolean),
+        features: features.filter((f) => f.title || f.subtitle),
+      },
+      freeTrials: freeTrials.filter((t) => t.title),
+      // units for “Course Content” tab
+      units: chapters.map((c, i) => ({
+        unitId: `u-${i + 1}`,
+        name: c.title || `Unit ${i + 1}`,
+        unitNumber: i + 1,
+        lessonsCount: Math.max(1, Number((c.duration || "0").split(":")[0]) || 2), // a tiny heuristic
+        videos: form.video ? [form.video] : [],
+        pdfs: [],
+      })),
+      // keep “sections” too if you use it elsewhere
       sections: [
         {
           id: `sec-${Date.now()}`,
@@ -62,6 +124,8 @@ export default function AddCoursePage() {
           })),
         },
       ],
+      instructor,
+      reviews,
     };
 
     try {
@@ -80,7 +144,7 @@ export default function AddCoursePage() {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
+      <div className="mx-auto max-w-7xl py-4">
         {/* Top bar */}
         <div className="flex items-center mb-4 justify-between gap-2">
           <button
@@ -109,18 +173,29 @@ export default function AddCoursePage() {
                   <input
                     value={form.title}
                     onChange={(e) => onChange("title", e.target.value)}
-                    placeholder="e.g., React & Next.js Complete Guide"
+                    placeholder="e.g., Egyptian Arabic Complete Course"
                     className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-sm font-medium">Description</label>
+                  <label className="text-sm font-medium">Short Description</label>
                   <textarea
                     value={form.description}
                     onChange={(e) => onChange("description", e.target.value)}
-                    rows={4}
-                    placeholder="What will students learn?"
+                    rows={3}
+                    placeholder="A short overview that appears on cards."
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-sm font-medium">Long Overview (details page)</label>
+                  <textarea
+                    value={form.longDescription}
+                    onChange={(e) => onChange("longDescription", e.target.value)}
+                    rows={5}
+                    placeholder="In-depth course overview for the details page."
                     className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                   />
                 </div>
@@ -145,7 +220,7 @@ export default function AddCoursePage() {
                   <input
                     value={form.duration}
                     onChange={(e) => onChange("duration", e.target.value)}
-                    placeholder="e.g., 6h 15m"
+                    placeholder="e.g., 12 weeks"
                     className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                   />
                 </div>
@@ -181,26 +256,129 @@ export default function AddCoursePage() {
                   <input
                     value={form.price}
                     onChange={(e) => onChange("price", e.target.value)}
-                    placeholder="$99"
+                    placeholder="$149"
                     className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                   />
+                </div>
+
+                <div className="sm:col-span-2 grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Video URL (optional)</label>
+                    <input
+                      value={form.video}
+                      onChange={(e) => onChange("video", e.target.value)}
+                      placeholder="https://cdn.example.com/intro.mp4"
+                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Poster Image URL</label>
+                    <input
+                      value={form.poster}
+                      onChange={(e) => onChange("poster", e.target.value)}
+                      placeholder="https://images.unsplash.com/..."
+                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Chapters / lessons */}
+            {/* What you'll learn & features */}
+            <div className="rounded-2xl bg-white border border-slate-200 p-5">
+              <h2 className="text-lg font-semibold">Overview Section</h2>
+              <p className="text-sm text-slate-600 mt-1">What students learn & course features.</p>
+
+              {/* Learn items */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">What you'll learn</span>
+                  <button
+                    type="button"
+                    onClick={addLearn}
+                    className="inline-flex items-center gap-2 rounded-lg border px-2 py-1 text-sm hover:bg-slate-50"
+                  >
+                    <Plus size={14} /> Add item
+                  </button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {learnItems.map((li, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        value={li}
+                        onChange={(e) => updateLearn(i, e.target.value)}
+                        placeholder={`Point #${i + 1}`}
+                        className="flex-1 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeLearn(i)}
+                        className="rounded-lg border px-3 hover:bg-slate-50"
+                        aria-label="Remove"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Feature cards */}
+              <div className="mt-6">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Feature cards</span>
+                  <button
+                    type="button"
+                    onClick={addFeature}
+                    className="inline-flex items-center gap-2 rounded-lg border px-2 py-1 text-sm hover:bg-slate-50"
+                  >
+                    <Plus size={14} /> Add feature
+                  </button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {features.map((f, i) => (
+                    <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                      <input
+                        value={f.title}
+                        onChange={(e) => updateFeature(i, "title", e.target.value)}
+                        placeholder="Title (e.g., Audio Lessons)"
+                        className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                      />
+                      <input
+                        value={f.subtitle}
+                        onChange={(e) => updateFeature(i, "subtitle", e.target.value)}
+                        placeholder="Subtitle"
+                        className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeFeature(i)}
+                        className="rounded-lg border px-3 hover:bg-slate-50"
+                        aria-label="Remove"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Chapters / units */}
             <div className="rounded-2xl bg-white border border-slate-200 p-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-semibold">Videos</h2>
-                  <p className="text-sm text-slate-600 mt-1">Add Video titles and Source</p>
+                  <h2 className="text-lg font-semibold">Course Content</h2>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Add units (we'll also create lessons for your “sections” array).
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={addChapter}
                   className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-3 py-2 text-sm hover:opacity-90"
                 >
-                  <Plus size={16} /> Add
+                  <Plus size={16} /> Add Unit
                 </button>
               </div>
 
@@ -208,34 +386,43 @@ export default function AddCoursePage() {
                 {chapters.map((c, i) => (
                   <div
                     key={i}
-                    className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 p-3 md:[grid-template-columns:1fr_120px_auto]"
+                    className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 p-3 md:[grid-template-columns:1fr_160px_auto]"
                   >
-                    {/* File input as button (mobile-friendly) */}
                     <div className="flex flex-col gap-2">
-                      <label className="text-xs text-slate-600">Video file / title</label>
+                      <label className="text-xs text-slate-600">Unit title</label>
                       <div className="flex gap-2">
                         <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer w-full">
                           <Upload size={16} />
                           <span className="truncate">
-                            {c.title ? c.title.split("\\").pop() : `Select file or enter a title`}
+                            {c.title ? c.title : `Select file or enter a title`}
                           </span>
                           <input
                             type="file"
                             className="sr-only"
-                            onChange={(e) => updateChapter(i, "title", e.target.value)}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) updateChapter(i, "title", f.name);
+                            }}
                           />
                         </label>
                       </div>
-                      {/* Optional manual title input for small screens */}
                       <input
-                        placeholder={`Lesson ${i + 1} title`}
+                        placeholder={`Unit ${i + 1} title`}
                         value={c.title}
                         onChange={(e) => updateChapter(i, "title", e.target.value)}
                         className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)] md:hidden"
                       />
                     </div>
 
-                  
+                    <div>
+                      <label className="text-xs text-slate-600">Approx. duration</label>
+                      <input
+                        value={c.duration}
+                        onChange={(e) => updateChapter(i, "duration", e.target.value)}
+                        placeholder="e.g., 05:00"
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                      />
+                    </div>
 
                     <div className="flex items-end justify-end">
                       <button
@@ -250,6 +437,32 @@ export default function AddCoursePage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Instructor */}
+            <div className="rounded-2xl bg-white border border-slate-200 p-5">
+              <h2 className="text-lg font-semibold">Instructor</h2>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <input
+                  value={instructor.name}
+                  onChange={(e) => setInstructor((s) => ({ ...s, name: e.target.value }))}
+                  placeholder="Name"
+                  className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                />
+                <input
+                  value={instructor.role}
+                  onChange={(e) => setInstructor((s) => ({ ...s, role: e.target.value }))}
+                  placeholder="Role / Title"
+                  className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                />
+                <textarea
+                  value={instructor.bio}
+                  onChange={(e) => setInstructor((s) => ({ ...s, bio: e.target.value }))}
+                  rows={4}
+                  placeholder="Short bio"
+                  className="sm:col-span-2 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                />
               </div>
             </div>
 
