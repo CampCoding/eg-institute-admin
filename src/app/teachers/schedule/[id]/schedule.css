@@ -1,0 +1,499 @@
+.schedule-wrapper {
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  direction: ltr;
+}
+
+.schedule-header-section {
+  margin-bottom: 20px;
+}
+
+.schedule-main-title {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #02aaa0;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.schedule-content {
+  width: 100%;
+}
+
+.schedule-container {
+  width: 100%;
+  max-width: 1100px;
+  overflow-x: auto;
+  margin-top: 20px;
+  direction: ltr;
+}
+
+.week-info {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.week-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #02aaa0;
+}
+
+.schedule-grid {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  /* min-width: 800px; */
+}
+
+.schedule-header {
+  display: table-row;
+  background-color: rgba(2, 170, 160, 0.1);
+}
+
+.schedule-row {
+  display: table-row;
+}
+
+.schedule-cell {
+  display: table-cell;
+  border: 1px solid rgba(2, 170, 160, 0.3);
+  padding: 10px;
+  vertical-align: top;
+  position: relative;
+}
+
+.day-header {
+  font-weight: bold;
+  text-align: center;
+  background-color: #02aaa0;
+  color: white;
+  min-width: 100px;
+}
+
+.time-header {
+  font-weight: bold;
+  text-align: center;
+  background-color: rgba(2, 170, 160, 0.8);
+  color: white;
+  min-width: 150px;
+}
+
+.day-cell {
+  font-weight: bold;
+  text-align: center;
+  background-color: rgba(2, 170, 160, 0.6);
+  color: white;
+}
+
+.time-cell {
+  min-height: 80px;
+  height: 100px;
+  background-color: rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+}
+
+.time-cell:hover {
+  background-color: rgba(2, 170, 160, 0.1);
+}
+
+.lesson-card {
+  background: linear-gradient(
+    135deg,
+    rgba(2, 170, 160, 0.1) 0%,
+    rgba(2, 170, 160, 0.3) 100%
+  );
+  border: 1px solid #02aaa0;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 5px;
+  font-size: 0.85rem;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.lesson-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(2, 170, 160, 0.2);
+  background: linear-gradient(
+    135deg,
+    rgba(2, 170, 160, 0.2) 0%,
+    rgba(2, 170, 160, 0.4) 100%
+  );
+}
+
+.lesson-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #02aaa0;
+}
+
+.lesson-time {
+  font-size: 0.75rem;
+  margin-bottom: 2px;
+  color: #666;
+}
+
+.lesson-duration {
+  margin-right: 4px;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.lesson-group-type {
+  font-size: 0.7rem;
+  margin-top: 2px;
+  padding: 2px 5px;
+  border-radius: 10px;
+  display: inline-block;
+  background-color: rgba(2, 170, 160, 0.2);
+  color: #02aaa0;
+}
+
+.group-lesson {
+  border-color: rgba(2, 170, 160, 0.8);
+  background: linear-gradient(
+    135deg,
+    rgba(2, 170, 160, 0.15) 0%,
+    rgba(2, 170, 160, 0.35) 100%
+  );
+}
+
+/* Modal Styles */
+.custom-modal .ant-modal-content {
+  background-color: #f8f9fa;
+  border: 1px solid #02aaa0;
+  border-radius: 12px;
+}
+
+.custom-modal .ant-modal-header {
+  background-color: #02aaa0;
+  border-bottom: 1px solid #02aaa0;
+  border-radius: 12px 12px 0 0;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-modal .ant-modal-title {
+  color: white !important;
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.custom-modal .ant-modal-close {
+  color: white;
+}
+
+.custom-modal .ant-modal-body {
+  padding: 24px;
+  direction: ltr;
+}
+
+.custom-modal .ant-modal-footer {
+  border-top: 1px solid #02aaa0;
+  padding: 16px 24px;
+  text-align: left;
+}
+
+.custom-form {
+  direction: ltr;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #02aaa0;
+  font-weight: bold;
+}
+
+.custom-input {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(2, 170, 160, 0.5) !important;
+  color: #333 !important;
+  border-radius: 8px !important;
+}
+
+.custom-input:focus {
+  border-color: #02aaa0 !important;
+  box-shadow: 0 0 0 2px rgba(2, 170, 160, 0.2) !important;
+}
+
+.modal-submit-button {
+  background: linear-gradient(135deg, #02aaa0, #028a82);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 24px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.modal-submit-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(2, 170, 160, 0.3);
+}
+
+.modal-submit-button:disabled {
+  background: #666;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Ant Design Switch Override */
+.ant-switch {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.ant-switch-checked {
+  background-color: #02aaa0 !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .schedule-wrapper {
+    padding: 10px;
+  }
+
+  .schedule-container {
+    margin-top: 10px;
+  }
+
+  .time-cell {
+    height: 80px;
+  }
+
+  .lesson-card {
+    padding: 6px;
+    font-size: 0.75rem;
+  }
+
+  .schedule-main-title {
+    font-size: 1.5rem;
+  }
+}
+/* Add Lesson Button */
+.add-lesson-btn {
+  background: linear-gradient(135deg, #02aaa0, #028a82) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(2, 170, 160, 0.3) !important;
+  transition: all 0.3s ease !important;
+}
+
+.add-lesson-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(2, 170, 160, 0.4) !important;
+}
+
+.schedule-header-section .flex {
+  display: flex;
+}
+
+.schedule-header-section .justify-between {
+  justify-content: space-between;
+}
+
+.schedule-header-section .items-center {
+  align-items: center;
+}
+
+/* Add Lesson Modal */
+.add-lesson-modal .ant-modal-content {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.add-lesson-modal .ant-modal-header {
+  background: linear-gradient(135deg, #02aaa0, #028a82);
+  border-radius: 12px 12px 0 0;
+  border-bottom: none;
+  padding: 20px 24px;
+}
+
+.add-lesson-modal .ant-modal-title {
+  color: white !important;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.add-lesson-modal .ant-modal-body {
+  padding: 30px 24px 20px;
+}
+
+/* Modal Close Button - Black */
+.modal-close-btn {
+  color: #000000 !important;
+  font-size: 24px;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+}
+
+/* Form Styling */
+.add-lesson-form {
+  direction: ltr;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.form-item-half {
+  flex: 1;
+}
+
+.form-item-half .ant-form-item {
+  margin-bottom: 0;
+}
+
+/* Custom Form Controls */
+.custom-select .ant-select-selector {
+  border: 2px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  height: auto !important;
+  min-height: 48px !important;
+  transition: all 0.3s ease !important;
+}
+
+.custom-select .ant-select-selector:hover {
+  border-color: #02aaa0 !important;
+}
+
+.custom-select.ant-select-focused .ant-select-selector {
+  border-color: #02aaa0 !important;
+  box-shadow: 0 0 0 3px rgba(2, 170, 160, 0.1) !important;
+}
+
+.custom-time-picker {
+  width: 100% !important;
+}
+
+.custom-time-picker .ant-picker {
+  border: 2px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  padding: 12px 16px !important;
+  height: 48px !important;
+  transition: all 0.3s ease !important;
+}
+
+.custom-time-picker .ant-picker:hover {
+  border-color: #02aaa0 !important;
+}
+
+.custom-time-picker .ant-picker.ant-picker-focused {
+  border-color: #02aaa0 !important;
+  box-shadow: 0 0 0 3px rgba(2, 170, 160, 0.1) !important;
+}
+
+/* Form Labels */
+.add-lesson-form .ant-form-item-label > label {
+  color: #374151;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.add-lesson-form .ant-form-item-label > label.ant-form-item-required::before {
+  color: #ef4444;
+}
+
+/* Modal Footer */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.cancel-button {
+  background: #ffffff !important;
+  border: 2px solid #d1d5db !important;
+  color: #6b7280 !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 0 24px !important;
+  height: 48px !important;
+  transition: all 0.3s ease !important;
+}
+
+.cancel-button:hover {
+  border-color: #9ca3af !important;
+  color: #374151 !important;
+  background: #f9fafb !important;
+}
+
+.submit-button {
+  background: linear-gradient(135deg, #02aaa0, #028a82) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 0 24px !important;
+  height: 48px !important;
+  transition: all 0.3s ease !important;
+}
+
+.submit-button:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(2, 170, 160, 0.3) !important;
+}
+
+/* Error Messages */
+.ant-form-item-explain-error {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Success/Error Messages */
+.ant-message {
+  z-index: 9999;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .schedule-header-section .flex {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  .add-lesson-modal .ant-modal {
+    width: 95% !important;
+    margin: 10px auto;
+  }
+}
