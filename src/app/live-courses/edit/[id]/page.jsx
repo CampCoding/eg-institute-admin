@@ -3,7 +3,20 @@
 import React, { useState, useEffect } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Calendar, Clock, Users, Video, Globe } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  Users,
+  Video,
+  Globe,
+  Play,
+  X,
+} from "lucide-react";
+import { Upload, Progress, Radio, message } from "antd";
+import { InboxOutlined } from "@ant-design/icons";
+
+const { Dragger } = Upload;
 
 // Mock function to get course by ID
 const getCourseById = (id) => {
@@ -25,8 +38,33 @@ const getCourseById = (id) => {
         "https://images.unsplash.com/photo-1627398242454-45a1465c2479?q=80&w=1400&auto=format&fit=crop",
       totalSessions: 16,
       sessionDuration: "60",
+      advertisingVideoType: "url",
+      advertisingVideoUrl: "https://youtube.com/watch?v=example123",
+      advertisingVideoFile: null,
     },
-    // Add more mock courses...
+    {
+      id: 2,
+      title: "React Development Course",
+      description:
+        "Complete React development course with hooks, context, and modern patterns.",
+      teacher: "Mike Chen",
+      level: "Intermediate",
+      duration: "6 weeks",
+      price: "$199",
+      maxStudents: 30,
+      meetingLink: "",
+      schedule: "Tue, Thu - 2:00 PM",
+      timezone: "PST",
+      poster: "",
+      totalSessions: 12,
+      sessionDuration: "90",
+      advertisingVideoType: "upload",
+      advertisingVideoUrl: "",
+      advertisingVideoFile: {
+        name: "react-course-preview.mp4",
+        size: 25000000, // 25MB
+      },
+    },
   ];
 
   return courses.find((course) => course.id === parseInt(id));
@@ -35,10 +73,12 @@ const getCourseById = (id) => {
 export default function EditLiveCoursePage() {
   const router = useRouter();
   const params = useParams();
-  const courseId = params.id; // Use consistent parameter name
+  const courseId = params.id;
 
   const [loading, setLoading] = useState(false);
   const [courseLoading, setCourseLoading] = useState(true);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  const [videoUploading, setVideoUploading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -53,6 +93,9 @@ export default function EditLiveCoursePage() {
     poster: "",
     totalSessions: "",
     sessionDuration: "60",
+    advertisingVideoType: "url",
+    advertisingVideoUrl: "",
+    advertisingVideoFile: null,
   });
 
   useEffect(() => {
@@ -75,10 +118,14 @@ export default function EditLiveCoursePage() {
             poster: course.poster || "",
             totalSessions: course.totalSessions?.toString() || "",
             sessionDuration: course.sessionDuration?.toString() || "60",
+            advertisingVideoType: course.advertisingVideoType || "url",
+            advertisingVideoUrl: course.advertisingVideoUrl || "",
+            advertisingVideoFile: course.advertisingVideoFile || null,
           });
         }
       } catch (error) {
         console.error("Error loading course:", error);
+        message.error("Failed to load course data.");
       } finally {
         setCourseLoading(false);
       }
@@ -97,20 +144,111 @@ export default function EditLiveCoursePage() {
     }));
   };
 
+  const handleVideoTypeChange = (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      advertisingVideoType: e.target.value,
+      advertisingVideoUrl: "",
+      advertisingVideoFile: null,
+    }));
+    setVideoUploadProgress(0);
+    setVideoUploading(false);
+  };
+
+  const handleVideoUpload = (file) => {
+    // Validate file type
+    const isVideo = file.type.startsWith("video/");
+    if (!isVideo) {
+      message.error("You can only upload video files!");
+      return false;
+    }
+
+    // Validate file size (500MB limit)
+    const isLt500M = file.size / 1024 / 1024 < 500;
+    if (!isLt500M) {
+      message.error("Video must be smaller than 500MB!");
+      return false;
+    }
+
+    // Start upload simulation
+    setVideoUploading(true);
+    setVideoUploadProgress(0);
+
+    // Simulate upload progress
+    const interval = setInterval(() => {
+      setVideoUploadProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(interval);
+          return 90;
+        }
+        return prev + Math.random() * 10;
+      });
+    }, 300);
+
+    // Simulate upload completion
+    setTimeout(() => {
+      clearInterval(interval);
+      setVideoUploadProgress(100);
+      setVideoUploading(false);
+
+      // Store the file in form data
+      setFormData((prev) => ({
+        ...prev,
+        advertisingVideoFile: file,
+      }));
+
+      message.success(`${file.name} uploaded successfully!`);
+    }, 3000);
+
+    // Prevent default upload behavior
+    return false;
+  };
+
+  const removeUploadedVideo = () => {
+    setFormData((prev) => ({
+      ...prev,
+      advertisingVideoFile: null,
+    }));
+    setVideoUploadProgress(0);
+    setVideoUploading(false);
+  };
+
+  const uploadProps = {
+    name: "video",
+    multiple: false,
+    accept: "video/*",
+    showUploadList: false,
+    beforeUpload: handleVideoUpload,
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // Create FormData for file upload
+      const submitData = new FormData();
+
+      // Add all form fields
+      Object.keys(formData).forEach((key) => {
+        if (key === "advertisingVideoFile" && formData[key]) {
+          submitData.append("advertisingVideo", formData[key]);
+        } else if (key !== "advertisingVideoFile") {
+          submitData.append(key, formData[key]);
+        }
+      });
+
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       console.log("Updating live course:", formData);
+      console.log("Updated video file:", formData.advertisingVideoFile);
 
       // Redirect to live courses page
       router.push("/live-courses");
     } catch (error) {
       console.error("Error updating course:", error);
+      message.error("Failed to update course. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -272,6 +410,158 @@ export default function EditLiveCoursePage() {
             </div>
           </div>
 
+          {/* Advertising Video Section */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <Play className="w-5 h-5 text-[var(--primary-color)]" />
+              Advertising Video
+            </h2>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Video Source
+                </label>
+                <Radio.Group
+                  value={formData.advertisingVideoType}
+                  onChange={handleVideoTypeChange}
+                  className="space-x-6"
+                >
+                  <Radio value="url">Video URL</Radio>
+                  <Radio value="upload">Upload Video</Radio>
+                </Radio.Group>
+              </div>
+
+              {formData.advertisingVideoType === "url" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Video URL
+                  </label>
+                  <input
+                    type="url"
+                    name="advertisingVideoUrl"
+                    value={formData.advertisingVideoUrl}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent"
+                    placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
+                  />
+                  <p className="text-sm text-slate-500 mt-2">
+                    Supported: YouTube, Vimeo, or direct video file URLs
+                  </p>
+
+                  {formData.advertisingVideoUrl && (
+                    <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-700">
+                        <strong>Current URL:</strong>{" "}
+                        {formData.advertisingVideoUrl}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {formData.advertisingVideoType === "upload" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Upload Video File
+                  </label>
+
+                  {!formData.advertisingVideoFile && !videoUploading && (
+                    <Dragger
+                      {...uploadProps}
+                      className="border-2 border-dashed border-slate-300 rounded-xl hover:border-[var(--primary-color)]"
+                    >
+                      <p className="ant-upload-drag-icon">
+                        <InboxOutlined
+                          style={{ fontSize: "48px", color: "#9ca3af" }}
+                        />
+                      </p>
+                      <p className="ant-upload-text text-lg font-medium text-slate-700">
+                        Click or drag video file to this area to upload
+                      </p>
+                      <p className="ant-upload-hint text-slate-500">
+                        Support for MP4, AVI, MOV, WMV formats. Maximum file
+                        size: 500MB
+                      </p>
+                    </Dragger>
+                  )}
+
+                  {videoUploading && (
+                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-blue-700">
+                          Uploading video...
+                        </span>
+                        <span className="text-sm text-blue-600">
+                          {Math.round(videoUploadProgress)}%
+                        </span>
+                      </div>
+                      <Progress
+                        percent={videoUploadProgress}
+                        status="active"
+                        strokeColor="#3b82f6"
+                        className="mb-2"
+                      />
+                    </div>
+                  )}
+
+                  {formData.advertisingVideoFile && !videoUploading && (
+                    <div className="p-4 bg-green-50 rounded-xl border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Video className="w-5 h-5 text-green-600" />
+                          <div>
+                            <p className="font-medium text-green-900">
+                              {formData.advertisingVideoFile.name}
+                            </p>
+                            <p className="text-sm text-green-700">
+                              {(
+                                formData.advertisingVideoFile.size /
+                                (1024 * 1024)
+                              ).toFixed(2)}{" "}
+                              MB
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
+                            Current Video
+                          </span>
+                          <button
+                            type="button"
+                            onClick={removeUploadedVideo}
+                            className="p-1 rounded-full hover:bg-green-200 transition-colors"
+                            title="Remove video"
+                          >
+                            <X className="w-4 h-4 text-green-600" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.advertisingVideoFile && (
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            advertisingVideoFile: null,
+                          }));
+                          setVideoUploadProgress(0);
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Upload a different video
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Session Settings */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6">
             <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
@@ -375,20 +665,6 @@ export default function EditLiveCoursePage() {
                   placeholder="50"
                 />
               </div>
-
-              {/* <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Meeting Platform Link
-                </label>
-                <input
-                  type="url"
-                  name="meetingLink"
-                  value={formData.meetingLink}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent"
-                  placeholder="https://zoom.us/j/123456789"
-                />
-              </div> */}
             </div>
           </div>
 
@@ -403,7 +679,7 @@ export default function EditLiveCoursePage() {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || videoUploading}
               className="px-8 py-3 bg-[var(--primary-color)] text-white rounded-xl font-medium hover:opacity-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {loading ? (

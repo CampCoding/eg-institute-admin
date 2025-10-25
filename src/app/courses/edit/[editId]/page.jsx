@@ -3,8 +3,20 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import { Loader2, Save, Plus, X, Upload, ArrowLeft } from "lucide-react";
+import {
+  Loader2,
+  Save,
+  Plus,
+  X,
+  Upload as UploadIcon,
+  ArrowLeft,
+  Play,
+} from "lucide-react";
+import { Upload, Progress, Radio, message } from "antd";
+import { InboxOutlined } from "@ant-design/icons";
 import { courses as seedCourses, teachers } from "@/utils/data";
+
+const { Dragger } = Upload;
 
 const LEVELS = ["Beginner", "Intermediate", "Advanced", "All Levels"];
 const GRADIENTS = [
@@ -68,6 +80,10 @@ export default function EditCoursePage() {
     video: "",
     poster: "",
     color: GRADIENTS[0],
+    // New advertising video fields
+    advertisingVideoType: "url", // 'url' or 'upload'
+    advertisingVideoUrl: "",
+    advertisingVideoFile: null,
   });
 
   // Overview blocks
@@ -83,11 +99,20 @@ export default function EditCoursePage() {
 
   // Free trials
   const [freeTrials, setFreeTrials] = useState([
-    { id: "ft-1", title: "Egyptian Arabic Basics - Free Trial", questions: 20, duration: "25 min", type: "MCQ", isFree: true },
+    {
+      id: "ft-1",
+      title: "Egyptian Arabic Basics - Free Trial",
+      questions: 20,
+      duration: "25 min",
+      type: "MCQ",
+      isFree: true,
+    },
   ]);
 
   // Content/units editor
-  const [chapters, setChapters] = useState([{ title: "Introduction", duration: "05:00" }]);
+  const [chapters, setChapters] = useState([
+    { title: "Introduction", duration: "05:00" },
+  ]);
 
   const [instructor, setInstructor] = useState({
     name: teachers?.[0]?.name || "Ahmed Hassan",
@@ -97,6 +122,8 @@ export default function EditCoursePage() {
   });
 
   const [saving, setSaving] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  const [videoUploading, setVideoUploading] = useState(false);
   const valid = useMemo(() => !!form.title && !!form.description, [form]);
 
   // load existing course (seed + drafts)
@@ -120,6 +147,9 @@ export default function EditCoursePage() {
       video: existing.video || "",
       poster: existing.poster || "",
       color: existing.color || s.color,
+      advertisingVideoType: existing.advertisingVideoType || "url",
+      advertisingVideoUrl: existing.advertisingVideoUrl || "",
+      advertisingVideoFile: existing.advertisingVideoFile || null,
     }));
 
     // overview
@@ -129,11 +159,15 @@ export default function EditCoursePage() {
         : learnItems
     );
     setFeatures(
-      existing?.overview?.features?.length ? existing.overview.features : features
+      existing?.overview?.features?.length
+        ? existing.overview.features
+        : features
     );
 
     // free trials
-    setFreeTrials(existing?.freeTrials?.length ? existing.freeTrials : freeTrials);
+    setFreeTrials(
+      existing?.freeTrials?.length ? existing.freeTrials : freeTrials
+    );
 
     // chapters/units
     setChapters(toChaptersFromCourse(existing));
@@ -145,29 +179,125 @@ export default function EditCoursePage() {
   // small setters
   const onChange = (key, val) => setForm((s) => ({ ...s, [key]: val }));
 
+  // Video upload handlers
+  const handleVideoTypeChange = (e) => {
+    setForm((prev) => ({
+      ...prev,
+      advertisingVideoType: e.target.value,
+      advertisingVideoUrl: "",
+      advertisingVideoFile: null,
+    }));
+    setVideoUploadProgress(0);
+    setVideoUploading(false);
+  };
+
+  const handleVideoUpload = (file) => {
+    // Validate file type
+    const isVideo = file.type.startsWith("video/");
+    if (!isVideo) {
+      message.error("You can only upload video files!");
+      return false;
+    }
+
+    // Validate file size (500MB limit)
+    const isLt500M = file.size / 1024 / 1024 < 500;
+    if (!isLt500M) {
+      message.error("Video must be smaller than 500MB!");
+      return false;
+    }
+
+    // Start upload simulation
+    setVideoUploading(true);
+    setVideoUploadProgress(0);
+
+    // Simulate upload progress
+    const interval = setInterval(() => {
+      setVideoUploadProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(interval);
+          return 90;
+        }
+        return prev + Math.random() * 10;
+      });
+    }, 300);
+
+    // Simulate upload completion
+    setTimeout(() => {
+      clearInterval(interval);
+      setVideoUploadProgress(100);
+      setVideoUploading(false);
+
+      // Store the file in form data
+      setForm((prev) => ({
+        ...prev,
+        advertisingVideoFile: file,
+      }));
+
+      message.success(`${file.name} uploaded successfully!`);
+    }, 3000);
+
+    // Prevent default upload behavior
+    return false;
+  };
+
+  const removeUploadedVideo = () => {
+    setForm((prev) => ({
+      ...prev,
+      advertisingVideoFile: null,
+    }));
+    setVideoUploadProgress(0);
+    setVideoUploading(false);
+  };
+
+  const uploadProps = {
+    name: "video",
+    multiple: false,
+    accept: "video/*",
+    showUploadList: false,
+    beforeUpload: handleVideoUpload,
+  };
+
+  // Other handlers
   const addLearn = () => setLearnItems((s) => [...s, ""]);
   const updateLearn = (i, v) =>
     setLearnItems((s) => s.map((x, idx) => (idx === i ? v : x)));
-  const removeLearn = (i) => setLearnItems((s) => s.filter((_, idx) => idx !== i));
+  const removeLearn = (i) =>
+    setLearnItems((s) => s.filter((_, idx) => idx !== i));
 
-  const addFeature = () => setFeatures((s) => [...s, { title: "", subtitle: "" }]);
+  const addFeature = () =>
+    setFeatures((s) => [...s, { title: "", subtitle: "" }]);
   const updateFeature = (i, key, v) =>
     setFeatures((s) => s.map((f, idx) => (idx === i ? { ...f, [key]: v } : f)));
-  const removeFeature = (i) => setFeatures((s) => s.filter((_, idx) => idx !== i));
+  const removeFeature = (i) =>
+    setFeatures((s) => s.filter((_, idx) => idx !== i));
 
   const addTrial = () =>
     setFreeTrials((s) => [
       ...s,
-      { id: `ft-${Date.now()}`, title: "", questions: 0, duration: "10 min", type: "MCQ", isFree: true },
+      {
+        id: `ft-${Date.now()}`,
+        title: "",
+        questions: 0,
+        duration: "10 min",
+        type: "MCQ",
+        isFree: true,
+      },
     ]);
   const updateTrial = (i, key, v) =>
-    setFreeTrials((s) => s.map((t, idx) => (idx === i ? { ...t, [key]: v } : t)));
-  const removeTrial = (i) => setFreeTrials((s) => s.filter((_, idx) => idx !== i));
+    setFreeTrials((s) =>
+      s.map((t, idx) => (idx === i ? { ...t, [key]: v } : t))
+    );
+  const removeTrial = (i) =>
+    setFreeTrials((s) => s.filter((_, idx) => idx !== i));
 
-  const addChapter = () => setChapters((s) => [...s, { title: "", duration: "00:00" }]);
-  const removeChapter = (i) => setChapters((s) => s.filter((_, idx) => idx !== i));
+  const addChapter = () =>
+    setChapters((s) => [...s, { title: "", duration: "00:00" }]);
+  const removeChapter = (i) =>
+    setChapters((s) => s.filter((_, idx) => idx !== i));
   const updateChapter = (i, key, val) =>
-    setChapters((s) => s.map((c, idx) => (idx === i ? { ...c, [key]: val } : c)));
+    setChapters((s) =>
+      s.map((c, idx) => (idx === i ? { ...c, [key]: val } : c))
+    );
 
   // submit/save
   const handleSubmit = async (e) => {
@@ -189,7 +319,10 @@ export default function EditCoursePage() {
         unitId: `u-${i + 1}`,
         name: c.title || `Unit ${i + 1}`,
         unitNumber: i + 1,
-        lessonsCount: Math.max(1, Number((c.duration || "0").split(":")[0]) || 2),
+        lessonsCount: Math.max(
+          1,
+          Number((c.duration || "0").split(":")[0]) || 2
+        ),
         videos: form.video ? [form.video] : [],
         pdfs: [],
       })),
@@ -208,6 +341,23 @@ export default function EditCoursePage() {
       instructor,
     };
 
+    // Create FormData for file upload
+    const formData = new FormData();
+
+    // Add all form fields to FormData
+    Object.keys(payload).forEach((key) => {
+      if (key === "advertisingVideoFile" && form.advertisingVideoFile) {
+        formData.append("advertisingVideo", form.advertisingVideoFile);
+      } else if (key !== "advertisingVideoFile") {
+        formData.append(
+          key,
+          typeof payload[key] === "object"
+            ? JSON.stringify(payload[key])
+            : payload[key]
+        );
+      }
+    });
+
     try {
       // Persist to drafts, replacing same id if exists
       const drafts = JSON.parse(localStorage.getItem("courseDrafts") || "[]");
@@ -221,10 +371,14 @@ export default function EditCoursePage() {
         next = [payload, ...drafts];
       }
       localStorage.setItem("courseDrafts", JSON.stringify(next));
+
+      console.log("Updating course:", payload);
+      console.log("Updated video file:", form.advertisingVideoFile);
+
       router.push("/courses");
     } catch (err) {
       console.error(err);
-      alert("Failed to save course. Check console for details.");
+      message.error("Failed to save course. Check console for details.");
     } finally {
       setSaving(false);
     }
@@ -279,7 +433,9 @@ export default function EditCoursePage() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-sm font-medium">Long Overview (details page)</label>
+                <label className="text-sm font-medium">
+                  Long Overview (details page)
+                </label>
                 <textarea
                   value={form.longDescription}
                   onChange={(e) => onChange("longDescription", e.target.value)}
@@ -352,7 +508,9 @@ export default function EditCoursePage() {
 
               <div className="sm:col-span-2 grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">Video URL (optional)</label>
+                  <label className="text-sm font-medium">
+                    Video URL (optional)
+                  </label>
                   <input
                     value={form.video}
                     onChange={(e) => onChange("video", e.target.value)}
@@ -361,7 +519,9 @@ export default function EditCoursePage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Poster Image URL</label>
+                  <label className="text-sm font-medium">
+                    Poster Image URL
+                  </label>
                   <input
                     value={form.poster}
                     onChange={(e) => onChange("poster", e.target.value)}
@@ -373,10 +533,165 @@ export default function EditCoursePage() {
             </div>
           </div>
 
+          {/* Advertising Video Section */}
+          <div className="rounded-2xl bg-white border border-slate-200 p-5">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Play className="w-5 h-5 text-[var(--primary-color)]" />
+              Advertising Video
+            </h2>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Video Source
+                </label>
+                <Radio.Group
+                  value={form.advertisingVideoType}
+                  onChange={handleVideoTypeChange}
+                  className="space-x-6"
+                >
+                  <Radio value="url">Video URL</Radio>
+                  <Radio value="upload">Upload Video</Radio>
+                </Radio.Group>
+              </div>
+
+              {form.advertisingVideoType === "url" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Video URL
+                  </label>
+                  <input
+                    type="url"
+                    name="advertisingVideoUrl"
+                    value={form.advertisingVideoUrl}
+                    onChange={(e) =>
+                      onChange("advertisingVideoUrl", e.target.value)
+                    }
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent"
+                    placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
+                  />
+                  <p className="text-sm text-slate-500 mt-2">
+                    Supported: YouTube, Vimeo, or direct video file URLs
+                  </p>
+
+                  {form.advertisingVideoUrl && (
+                    <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-700">
+                        <strong>Current URL:</strong> {form.advertisingVideoUrl}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {form.advertisingVideoType === "upload" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Upload Video File
+                  </label>
+
+                  {!form.advertisingVideoFile && !videoUploading && (
+                    <Dragger
+                      {...uploadProps}
+                      className="border-2 border-dashed border-slate-300 rounded-xl hover:border-[var(--primary-color)]"
+                    >
+                      <p className="ant-upload-drag-icon">
+                        <InboxOutlined
+                          style={{ fontSize: "48px", color: "#9ca3af" }}
+                        />
+                      </p>
+                      <p className="ant-upload-text text-lg font-medium text-slate-700">
+                        Click or drag video file to this area to upload
+                      </p>
+                      <p className="ant-upload-hint text-slate-500">
+                        Support for MP4, AVI, MOV, WMV formats. Maximum file
+                        size: 500MB
+                      </p>
+                    </Dragger>
+                  )}
+
+                  {videoUploading && (
+                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-blue-700">
+                          Uploading video...
+                        </span>
+                        <span className="text-sm text-blue-600">
+                          {Math.round(videoUploadProgress)}%
+                        </span>
+                      </div>
+                      <Progress
+                        percent={videoUploadProgress}
+                        status="active"
+                        strokeColor="#3b82f6"
+                        className="mb-2"
+                      />
+                    </div>
+                  )}
+
+                  {form.advertisingVideoFile && !videoUploading && (
+                    <div className="p-4 bg-green-50 rounded-xl border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Play className="w-5 h-5 text-green-600" />
+                          <div>
+                            <p className="font-medium text-green-900">
+                              {form.advertisingVideoFile.name}
+                            </p>
+                            <p className="text-sm text-green-700">
+                              {(
+                                form.advertisingVideoFile.size /
+                                (1024 * 1024)
+                              ).toFixed(2)}{" "}
+                              MB
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
+                            Current Video
+                          </span>
+                          <button
+                            type="button"
+                            onClick={removeUploadedVideo}
+                            className="p-1 rounded-full hover:bg-green-200 transition-colors"
+                            title="Remove video"
+                          >
+                            <X className="w-4 h-4 text-green-600" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {form.advertisingVideoFile && (
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm((prev) => ({
+                            ...prev,
+                            advertisingVideoFile: null,
+                          }));
+                          setVideoUploadProgress(0);
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Upload a different video
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Overview editor */}
           <div className="rounded-2xl bg-white border border-slate-200 p-5">
             <h2 className="text-lg font-semibold">Overview Section</h2>
-            <p className="text-sm text-slate-600 mt-1">What students learn & course features.</p>
+            <p className="text-sm text-slate-600 mt-1">
+              What students learn & course features.
+            </p>
 
             {/* Learn list */}
             <div className="mt-4">
@@ -426,16 +741,23 @@ export default function EditCoursePage() {
               </div>
               <div className="mt-3 space-y-2">
                 {features.map((f, i) => (
-                  <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                  <div
+                    key={i}
+                    className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+                  >
                     <input
                       value={f.title}
-                      onChange={(e) => updateFeature(i, "title", e.target.value)}
+                      onChange={(e) =>
+                        updateFeature(i, "title", e.target.value)
+                      }
                       placeholder="Title (e.g., Audio Lessons)"
                       className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                     />
                     <input
                       value={f.subtitle}
-                      onChange={(e) => updateFeature(i, "subtitle", e.target.value)}
+                      onChange={(e) =>
+                        updateFeature(i, "subtitle", e.target.value)
+                      }
                       placeholder="Subtitle"
                       className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                     />
@@ -453,86 +775,14 @@ export default function EditCoursePage() {
             </div>
           </div>
 
-          {/* Free trials */}
-          {/* <div className="rounded-2xl bg-white border border-slate-200 p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Free Trials</h2>
-                <p className="text-sm text-slate-600 mt-1">
-                  Add free sample lessons (shown under the Free Trials tab).
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={addTrial}
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-3 py-2 text-sm hover:opacity-90"
-              >
-                <Plus size={16} /> Add
-              </button>
-            </div>
-
-            <div className="mt-3 space-y-3">
-              {freeTrials.map((t, i) => (
-                <div
-                  key={t.id}
-                  className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 p-3 md:[grid-template-columns:1.2fr_.6fr_.6fr_.6fr_auto]"
-                >
-                  <input
-                    value={t.title}
-                    onChange={(e) => updateTrial(i, "title", e.target.value)}
-                    placeholder="Title"
-                    className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                  />
-                  <input
-                    value={t.duration}
-                    onChange={(e) => updateTrial(i, "duration", e.target.value)}
-                    placeholder="Duration (e.g., 25 min)"
-                    className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    value={t.questions}
-                    onChange={(e) => updateTrial(i, "questions", Number(e.target.value))}
-                    placeholder="Questions"
-                    className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                  />
-                  <input
-                    value={t.type}
-                    onChange={(e) => updateTrial(i, "type", e.target.value)}
-                    placeholder="Type (e.g., MCQ)"
-                    className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                  />
-                  <div className="flex items-center justify-end gap-2">
-                    <label className="text-sm flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={!!t.isFree}
-                        onChange={(e) => updateTrial(i, "isFree", e.target.checked)}
-                      />
-                      Free
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => removeTrial(i)}
-                      className="rounded-lg border px-3 hover:bg-slate-50"
-                      aria-label="Remove"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div> */}
-
           {/* Units / Content */}
           <div className="rounded-2xl bg-white border border-slate-200 p-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Course Content</h2>
                 <p className="text-sm text-slate-600 mt-1">
-                  Edit units (we'll also update the lessons in your sections array).
+                  Edit units (we'll also update the lessons in your sections
+                  array).
                 </p>
               </div>
               <button
@@ -554,7 +804,7 @@ export default function EditCoursePage() {
                     <label className="text-xs text-slate-600">Unit title</label>
                     <div className="flex gap-2">
                       <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer w-full">
-                        <Upload size={16} />
+                        <UploadIcon size={16} />
                         <span className="truncate">
                           {c.title ? c.title : `Select file or enter a title`}
                         </span>
@@ -571,16 +821,22 @@ export default function EditCoursePage() {
                     <input
                       placeholder={`Unit ${i + 1} title`}
                       value={c.title}
-                      onChange={(e) => updateChapter(i, "title", e.target.value)}
+                      onChange={(e) =>
+                        updateChapter(i, "title", e.target.value)
+                      }
                       className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)] md:hidden"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs text-slate-600">Approx. duration</label>
+                    <label className="text-xs text-slate-600">
+                      Approx. duration
+                    </label>
                     <input
                       value={c.duration}
-                      onChange={(e) => updateChapter(i, "duration", e.target.value)}
+                      onChange={(e) =>
+                        updateChapter(i, "duration", e.target.value)
+                      }
                       placeholder="e.g., 05:00"
                       className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                     />
@@ -608,19 +864,25 @@ export default function EditCoursePage() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <input
                 value={instructor.name}
-                onChange={(e) => setInstructor((s) => ({ ...s, name: e.target.value }))}
+                onChange={(e) =>
+                  setInstructor((s) => ({ ...s, name: e.target.value }))
+                }
                 placeholder="Name"
                 className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
               />
               <input
                 value={instructor.role}
-                onChange={(e) => setInstructor((s) => ({ ...s, role: e.target.value }))}
+                onChange={(e) =>
+                  setInstructor((s) => ({ ...s, role: e.target.value }))
+                }
                 placeholder="Role / Title"
                 className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
               />
               <textarea
                 value={instructor.bio}
-                onChange={(e) => setInstructor((s) => ({ ...s, bio: e.target.value }))}
+                onChange={(e) =>
+                  setInstructor((s) => ({ ...s, bio: e.target.value }))
+                }
                 rows={4}
                 placeholder="Short bio"
                 className="sm:col-span-2 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
@@ -632,10 +894,14 @@ export default function EditCoursePage() {
           <div className="flex items-center gap-3">
             <button
               type="submit"
-              disabled={!valid || saving}
+              disabled={!valid || saving || videoUploading}
               className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-4 py-2 font-medium hover:opacity-90 disabled:opacity-60"
             >
-              {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              {saving ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : (
+                <Save size={18} />
+              )}
               Save changes
             </button>
             <button
@@ -652,7 +918,9 @@ export default function EditCoursePage() {
         <div>
           <div className="rounded-2xl bg-white border border-slate-200 p-5">
             <h3 className="font-semibold">Live preview</h3>
-            <p className="text-sm text-slate-600">Matches your courses grid style.</p>
+            <p className="text-sm text-slate-600">
+              Matches your courses grid style.
+            </p>
 
             <article className="group relative mt-4 overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300">
               {/* Soft blobs */}
@@ -681,7 +949,9 @@ export default function EditCoursePage() {
                     className="h-full w-full object-cover"
                   />
                 )}
-                <div className={`absolute inset-0 bg-gradient-to-r ${form.color} opacity-25`} />
+                <div
+                  className={`absolute inset-0 bg-gradient-to-r ${form.color} opacity-25`}
+                />
                 <div className="absolute top-3 left-3 flex gap-2">
                   <span className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200">
                     {form.level}
@@ -697,14 +967,21 @@ export default function EditCoursePage() {
                   {form.title || "Course title"}
                 </h2>
                 <p className="mt-1 text-slate-600 text-sm line-clamp-2">
-                  {form.description || "A short course description will appear here."}
+                  {form.description ||
+                    "A short course description will appear here."}
                 </p>
 
                 <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
                   <div className="flex items-center gap-3">
-                    <span className="inline-flex items-center gap-1" title="Lessons">
+                    <span
+                      className="inline-flex items-center gap-1"
+                      title="Lessons"
+                    >
                       <svg viewBox="0 0 24 24" className="h-4 w-4">
-                        <path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" />
+                        <path
+                          fill="currentColor"
+                          d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"
+                        />
                       </svg>
                       {form.lessons} lessons
                     </span>
@@ -718,7 +995,9 @@ export default function EditCoursePage() {
                       {form.teacher}
                     </span>
                   </div>
-                  <span className="font-semibold text-[var(--text-color)]">{form.price}</span>
+                  <span className="font-semibold text-[var(--text-color)]">
+                    {form.price}
+                  </span>
                 </div>
               </div>
             </article>
