@@ -14,20 +14,20 @@ const DashLayout = ({ children }) => {
     text: "#111827",
   };
 
-  let AdminToken = null;
+  let AccessToken = null;
 
   if (typeof window !== "undefined") {
-    const tokenString = localStorage.getItem("AdminToken");
+    const tokenString = localStorage.getItem("AccessToken");
     try {
-      AdminToken = tokenString ? tokenString : null;
+      AccessToken = tokenString ? tokenString : null;
     } catch (e) {
-      console.error("Invalid AdminToken JSON:", e);
-      AdminToken = null;
+      console.error("Invalid AccessToken JSON:", e);
+      AccessToken = null;
     }
   }
-  console.log(AdminToken);
+  console.log(AccessToken);
 
-  if (!AdminToken) {
+  if (!AccessToken) {
     if (window.location.pathname != "/login") {
       window.location.href = "/login";
     }

@@ -3,14 +3,15 @@
 import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import { Star, ChevronRight, Edit, Trash } from "lucide-react";
+import { Star, ChevronRight, Edit, Trash, Loader2 } from "lucide-react";
+import useGetAllTeachers from "../../utils/Api/GetAllTeachers";
 
 /**
  * If you already have teachers data in "@/utils/data",
  * import it and map to this shape (name, title, summary, tags, level, rating, students, photo).
  * The mock below matches the card design in your screenshot.
  */
-const seedTeachers = [
+const mappedTeachers = [
   {
     id: 1,
     name: "Dr. Amira Hassan",
@@ -81,25 +82,54 @@ const seedTeachers = [
 export default function TeachersPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const { data: teachers, isLoading, isError } = useGetAllTeachers();
+  console.log(teachers);
+
+  const mappedTeachers = teachers?.message?.map((teacher) => {
+    return {
+      id: teacher?.teacher_id,
+      name: teacher?.teacher_name,
+      title: teacher?.specialization,
+      summary:
+        "Weekly conversation circles focusing on fluency, confidence, and natural pacing.",
+      tags: [teacher?.tags],
+      level: teacher?.level,
+      rating: teacher?.rate,
+      students: 540,
+      photo:
+        teacher?.teacher_image ||
+        "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=1400&auto=format&fit=crop",
+    };
+  });
+  console.log(mappedTeachers);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return seedTeachers;
-    return seedTeachers.filter(
+    if (!q) return mappedTeachers;
+    return mappedTeachers.filter(
       (t) =>
         t.name.toLowerCase().includes(q) ||
         t.title.toLowerCase().includes(q) ||
         t.summary.toLowerCase().includes(q) ||
         t.tags.some((tag) => tag.toLowerCase().includes(q))
     );
-  }, [search]);
+  }, [search, mappedTeachers]);
+  console.log(filtered);
 
   const levelColor = (lvl) => {
     if (lvl === "Beginner") return "text-emerald-700";
     if (lvl === "Intermediate") return "text-blue-700";
     return "text-teal-700"; // Expert
   };
-
+  if (isLoading) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="inline-flex items-center gap-2 text-slate-600">
+          <Loader2 className="animate-spin" /> Loading Teachers.....
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen">
       <BreadCrumb title="Teachers" parent="Home" child="Teachers" />
@@ -124,7 +154,7 @@ export default function TeachersPage() {
 
       {/* Grid */}
       <div className="grid mt-6 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((t) => (
+        {filtered?.map((t) => (
           <article
             key={t.id}
             className="group relative overflow-hidden rounded-[22px] bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300"
@@ -145,7 +175,7 @@ export default function TeachersPage() {
               {/* Rating pill */}
               <div className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2 py-1 text-[12px] font-semibold shadow">
                 <Star size={14} className="fill-amber-400 text-amber-400" />
-                {t.rating.toFixed(1)}
+                {t?.rating}
               </div>
 
               {/* Middle-right chevron button */}
@@ -187,7 +217,9 @@ export default function TeachersPage() {
                   <span className="size-2 rounded-full bg-emerald-500 inline-block" />
                   {t.students.toLocaleString()}+ students
                 </span> */}
-                <span className="text-teal-700 font-medium">{t.level} Level</span>
+                <span className="text-teal-700 font-medium">
+                  {t.level} Level
+                </span>
               </div>
 
               {/* Actions (added Edit icon button) */}
@@ -225,7 +257,7 @@ export default function TeachersPage() {
       </div>
 
       {/* Empty state */}
-      {filtered.length === 0 && (
+      {filtered?.length === 0 && (
         <div className="text-center py-16">
           <div className="mx-auto size-14 rounded-full bg-slate-100 grid place-items-center text-slate-500">
             <Star size={18} />

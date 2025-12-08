@@ -21,6 +21,8 @@ import {
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { Tooltip } from "antd";
 import { useRouter } from "next/navigation";
+import useGetAllStudents from "../../utils/Api/GetAllStudents";
+import { Loader2 } from "lucide-react";
 
 export default function StudentsPage() {
   const router = useRouter();
@@ -31,7 +33,28 @@ export default function StudentsPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [viewMode, setViewMode] = useState("table"); // table or grid
 
-  const [students, setStudents] = useState([
+  const { data, isLoading, isError } = useGetAllStudents();
+  console.log({ data, isLoading, isError });
+
+  const students = data?.message?.map((student) => {
+    return {
+      id: student?.student_id,
+      name: student?.student_name,
+      email: student?.student_email,
+      country: student?.country,
+      timezone: student?.time_zone,
+      password: student?.password,
+      phone: student?.phone,
+      group: student?.student_group || "-",
+      level: student?.level || "Not subscribe",
+      status: student?.student_status === 0 ? "Inactive" : "Active",
+      enrollmentDate: "2023-09-15",
+      avatar: student?.image || "https://i.pravatar.cc/100?img=1",
+    };
+  });
+  console.log(students);
+
+  /*  const [students, setStudents] = useState([
     {
       id: 1,
       name: "Sarah Johnson",
@@ -116,9 +139,28 @@ export default function StudentsPage() {
       enrollmentDate: "2023-10-01",
       avatar: "https://i.pravatar.cc/100?img=6",
     },
-  ]);
+  ]); */
 
-  const filteredStudents = students.filter((student) => {
+  /*  const filteredStudents = students.filter((student) => {
+    const matchesSearch =
+      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.country.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === "all"
+        ? true
+        : student.status.toLowerCase() === statusFilter.toLowerCase();
+
+    const matchesGroup =
+      groupFilter === "all" ? true : student.group === groupFilter;
+
+    const matchesLevel =
+      levelFilter === "all" ? true : student.level === levelFilter;
+
+    return matchesSearch && matchesStatus && matchesGroup && matchesLevel;
+  }); */
+  const filteredStudents = students?.filter((student) => {
     const matchesSearch =
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -154,9 +196,10 @@ export default function StudentsPage() {
   };
 
   const getLevelColor = (level) => {
-    if (level === "hard") return "text-red-600 bg-red-50";
+    if (level === "advanced") return "text-red-600 bg-red-50";
     if (level === "intermediate") return "text-yellow-600 bg-yellow-50";
     if (level === "beginner") return "text-green-600 bg-green-50";
+    if (level === "Not subscribe") return "text-gray-600 bg-gray-100";
     return "text-gray-600 bg-gray-50";
   };
 
@@ -176,29 +219,29 @@ export default function StudentsPage() {
   const stats = [
     {
       title: "Total Students",
-      value: students.length,
+      value: students?.length,
       icon: UserOutlined,
       color: "bg-blue-500",
       change: "+12%",
     },
     {
       title: "Active Students",
-      value: students.filter((s) => s.status === "Active").length,
+      value: students?.filter((s) => s.status === "Active").length,
       icon: BookOutlined,
       color: "bg-green-500",
       change: "+8%",
     },
     {
       title: "Countries",
-      value: new Set(students.map((s) => s.country)).size,
+      value: new Set(students?.map((s) => s.country)).size,
       icon: GlobalOutlined,
       color: "bg-purple-500",
       change: "+2",
     },
     {
       title: "This Month",
-      value: students.filter((s) => {
-        const enrollDate = new Date(s.enrollmentDate);
+      value: students?.filter((s) => {
+        const enrollDate = new Date(s?.enrollmentDate);
         const currentDate = new Date();
         return (
           enrollDate.getMonth() === currentDate.getMonth() &&
@@ -211,8 +254,17 @@ export default function StudentsPage() {
     },
   ];
 
-  const uniqueGroups = [...new Set(students.map((s) => s.group))];
-  const uniqueLevels = [...new Set(students.map((s) => s.level))];
+  const uniqueGroups = [...new Set(students?.map((s) => s.group))];
+  const uniqueLevels = [...new Set(students?.map((s) => s.level))];
+  if (isLoading) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="inline-flex items-center gap-2 text-slate-600">
+          <Loader2 className="animate-spin" /> Loading Students.....
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">

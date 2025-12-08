@@ -1,5 +1,6 @@
 "use client";
 
+
 import React, { useMemo, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { courses as seedCourses } from "@/utils/data";

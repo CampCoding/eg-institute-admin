@@ -2,10 +2,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { useRouter } from "next/navigation";
-import { Bookmark, Trash, Edit } from "lucide-react";
+import { Bookmark, Trash, Edit, Eye } from "lucide-react";
 import DeleteModal from "../../components/DeleteModal/DeleteModal";
 import axios from "axios";
 import { BASE_URL } from "../../utils/base_url";
+import useDeleteBlog from "../../utils/Api/Blogs/DeleteBlog";
+import toast from "react-hot-toast";
+import Toggle from "../../utils/Api/Toggle";
 
 // If you have a real blogs file, import it and remove the mock below.
 // import { blogs as initialBlogs } from "@/utils/blogs";
@@ -122,23 +125,52 @@ export default function BlogsPage() {
     });
   }, [searchTerm, blogs]);
 
+  const handleDelete = async (blog) => {
+    console.log(blog);
+
+    const response = await useDeleteBlog({ id: blog });
+    if (response.status === "success") {
+      toast.success("Blog deleted successfully!");
+    }
+  };
   // delete selected blog (state + localStorage)
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!selectedBlog) return;
-    const toDeleteId = selectedBlog.id;
 
-    // upcreated_at state
-    setBlogs((prev) => prev.filter((b) => b.id !== toDeleteId));
+    console.log(selectedBlog);
 
-    // upcreated_at localStorage
-    try {
-      const drafts = JSON.parse(localStorage.getItem("blogDrafts") || "[]");
-      const next = drafts.filter((b) => b.id !== toDeleteId);
-      localStorage.setItem("blogDrafts", JSON.stringify(next));
-    } catch {}
+    const toDeleteId = selectedBlog?.blog_id;
+    console.log(toDeleteId);
 
+    // خزن نسخة للـrollback
+    const prevBlogs = blogs;
+
+    // 1) Optimistic update: شيل من UI فورًا
+    setBlogs((prev) => prev.filter((b) => b.blog_id !== toDeleteId));
+
+    // 2) اقفل المودال/فضي الاختيار
     setOpenDeleteModal(false);
     setSelectedBlog(null);
+
+    try {
+      // 3) نفّذ الحذف الحقيقي (استناه)
+      await handleDelete(toDeleteId);
+
+      // 4) حدّث localStorage بعد نجاح الحذف
+      const drafts = JSON.parse(localStorage.getItem("blogDrafts") || "[]");
+      const next = drafts.filter((b) => b.blog_id !== toDeleteId);
+      localStorage.setItem("blogDrafts", JSON.stringify(next));
+    } catch (e) {
+      // 5) لو فشل: رجّع الـUI زي ما كان
+      setBlogs(prevBlogs);
+
+      // اختياري: رجّع المودال أو رسالة
+      // setOpenDeleteModal(true);
+      // setSelectedBlog(prevBlogs.find(b => b.id === toDeleteId) ?? null);
+
+      console.error(e);
+      // toast.error("Delete failed");
+    }
   }
 
   const levelBadgeClass = (levelOrTag) => {
@@ -170,9 +202,7 @@ export default function BlogsPage() {
       day: "numeric",
     });
 
-  const accessToken = localStorage.getItem("AdminToken");
-
-  console.log(accessToken);
+  const accessToken = localStorage.getItem("AccessToken");
 
   const getBlogs = async () => {
     if (!accessToken) {
@@ -203,7 +233,7 @@ export default function BlogsPage() {
         setError("Request timeout. Please try again.");
       } else if (err.response?.status === 401) {
         setError("Session expired. Please log in again.");
-        localStorage.removeItem("AdminToken");
+        localStorage.removeItem("AccessToken");
         window.location.href = "/login";
       } else if (err.response?.status === 403) {
         setError("Access forbidden.");
@@ -221,6 +251,15 @@ export default function BlogsPage() {
   useEffect(() => {
     getBlogs();
   }, []);
+  const handleToggleBlog = async (id) => {
+    const response = await Toggle({
+      payload: { blog_id: id },
+      url: "blogs/toggle_blog.php",
+    });
+    if (response.status === "success") {
+      toast.success(response.message);
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -228,19 +267,29 @@ export default function BlogsPage() {
 
       {/* Search */}
       <div className="mt-4 w-full">
-        <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2 max-w-full ring-1 ring-slate-200">
-          <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-500">
-            <path
-              fill="currentColor"
-              d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"
+        <div className="flex  gap-2 sm:flex-row items-center justify-between">
+          <div className="flex items-center  rounded-2xl bg-white px-3 py-2 w-full ring-1 ring-slate-200">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-500">
+              <path
+                fill="currentColor"
+                d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"
+              />
+            </svg>
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search blogs"
+              className="bg-transparent outline-none text-sm w-full placeholder:text-slate-500"
             />
-          </svg>
-          <input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search blogs"
-            className="bg-transparent outline-none text-sm w-full placeholder:text-slate-500"
-          />
+          </div>
+          <div className=" flex justify-center ">
+            <button
+              onClick={() => router.push(`/blogs/add`)}
+              className=" px-4 py-2 bg-teal-600 !whitespace-nowrap text-white rounded-lg hover:bg-teal-700 transition-colors duration-200 flex items-center gap-2"
+            >
+              Add Blog
+            </button>
+          </div>
         </div>
       </div>
 
@@ -377,6 +426,13 @@ export default function BlogsPage() {
                   aria-label="Delete blog"
                 >
                   <Trash size={18} />
+                </button>
+                <button
+                  onClick={() => handleToggleBlog(b.blog_id)}
+                  className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
+                  aria-label="Delete blog"
+                >
+                  <Eye size={18} />
                 </button>
               </div>
             </div>

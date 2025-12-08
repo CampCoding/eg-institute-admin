@@ -353,7 +353,7 @@ const Sidebar = ({ colors, sidebarOpen, setSidebarOpen }) => {
               colors="red"
               className=" cursor-pointer text-red-600"
               onClick={() => {
-                localStorage.removeItem("AdminToken");
+                localStorage.removeItem("AccessToken");
                 window.location.href = "/login";
               }}
             />
