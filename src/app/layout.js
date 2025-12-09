@@ -2,7 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import DashLayout from "@/layout/DashLayout";
 import { Toaster } from "react-hot-toast";
-import Provider from "../utils/Provider";
+import ProviderWrapper from "../utils/Provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,10 +25,10 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Provider>
+        <ProviderWrapper>
           <DashLayout>{children}</DashLayout>
           <Toaster position="top-center" />
-        </Provider>
+        </ProviderWrapper>
       </body>
     </html>
   );

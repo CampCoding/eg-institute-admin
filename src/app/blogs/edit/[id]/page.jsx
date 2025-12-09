@@ -65,7 +65,6 @@ export default function EditBlogPage() {
   const { id } = useParams();
   const { data, isLoading, isError, error } = useGetBlogById({ id });
   console.log({ isLoading, isError, error });
-  console.log(data?.message);
 
   const {
     control,
@@ -193,7 +192,7 @@ export default function EditBlogPage() {
       console.log("FINAL PAYLOAD:", payload);
       const response = await usePostBlog({ payload, type: "edit", id });
       if (response.status === "success") {
-        toast.success("Blog added successfully!");
+        toast.success("Blog updated successfully!");
         reset();
         window.location.href = "/blogs";
       } else {
@@ -231,7 +230,7 @@ export default function EditBlogPage() {
           </button>
         </div>
 
-        <BreadCrumb title="Edit Blog" child="Blog" parent="Home" />
+        <BreadCrumb title="Edit Blog" child="Edit" parent="Blogs" />
 
         <form
           onSubmit={handleSubmit(onSubmit)}

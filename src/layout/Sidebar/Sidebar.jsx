@@ -246,7 +246,7 @@ const Sidebar = ({ colors, sidebarOpen, setSidebarOpen }) => {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto max-h-[calc(100vh-145px)]">
+        <nav className="flex-1 side-list px-4 py-6 space-y-2 overflow-y-auto max-h-[calc(100vh-145px)]">
           {links.map((item) => {
             const hasChildren = !!item.children?.length;
             const open = hasChildren && isMenuOpen(item);

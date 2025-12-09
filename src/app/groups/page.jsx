@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
+import useGetAllGroups from "../../utils/Api/Courses/GetAllGroups";
 
 export const initialGroups = [
   {
@@ -64,6 +65,23 @@ export const initialGroups = [
 
 export default function Page() {
   const [groups, setGroups] = useState(initialGroups);
+  const { data, isLoading } = useGetAllGroups();
+console.log(data);
+
+  const allGroups = data?.message?.map((g) => {
+    return {
+      id: g?.group_id,
+      name: g?.group_name,
+      members: g.members_count,
+      instructor: g?.teacher_name,
+      category: "Language",
+      progress: 75,
+      status: g?.status,
+      maxStudents: g?.max_students,
+    };
+  });
+  console.log(allGroups);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortBy, setSortBy] = useState("recent"); // recent | members | progress | name
@@ -74,8 +92,8 @@ export default function Page() {
   const [rowData, setRowData] = useState({});
 
   const categories = useMemo(
-    () => ["all", ...Array.from(new Set(groups.map((g) => g.category)))],
-    [groups]
+    () => ["all", ...Array.from(new Set(allGroups?.map((g) => g.category)))],
+    [allGroups]
   );
 
   const getStatusStyle = (status) => {
@@ -97,7 +115,7 @@ export default function Page() {
   };
 
   const filteredGroups = useMemo(() => {
-    let list = [...groups];
+    let list = allGroups;
 
     // search
     if (searchTerm.trim()) {
@@ -129,7 +147,8 @@ export default function Page() {
     // "recent" is default order in this demo (pretend already recent)
 
     return list;
-  }, [groups, searchTerm, filterStatus, sortBy, quickCat]);
+  }, [allGroups, searchTerm, filterStatus, sortBy, quickCat]);
+  console.log(filteredGroups);
 
   function handleSubmit() {
     console.log("Group Deleted");
@@ -186,7 +205,7 @@ export default function Page() {
                 <div className="text-slate-500 text-xs font-semibold">
                   Total Groups
                 </div>
-                <div className="mt-1 text-3xl font-bold">{groups.length}</div>
+                <div className="mt-1 text-3xl font-bold">{groups?.length}</div>
               </div>
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-50">
                 <Users className="text-blue-600" />
@@ -215,7 +234,7 @@ export default function Page() {
                   Active Groups
                 </div>
                 <div className="mt-1 text-3xl font-bold">
-                  {groups.filter((g) => g.status === "active").length}
+                  {groups?.filter((g) => g.status === "active")?.length}
                 </div>
               </div>
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-violet-50">
@@ -306,7 +325,7 @@ export default function Page() {
               : "mt-6 space-y-4"
           }
         >
-          {filteredGroups.map((g) => (
+          {filteredGroups?.map((g) => (
             <div
               key={g.id}
               className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-xl ${
@@ -350,17 +369,21 @@ export default function Page() {
                   </div>
 
                   <div className="mt-3 space-y-1.5">
-                    <div className="flex items-center text-sm text-slate-600">
-                      <Users size={16} className="mr-2 text-slate-400" />{" "}
-                      {g.members} members
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center text-sm text-slate-600">
+                        <Users size={16} className="mr-2 text-slate-400" />{" "}
+                        {g.maxStudents} Member limit
+                      </div>
+                      <div className="flex items-center text-sm text-slate-600">
+                        <Users size={16} className="mr-2 text-slate-400" />{" "}
+                        {g.members} Member
+                      </div>
                     </div>
                     <div className="text-sm text-slate-600">
                       <span className="font-medium">Instructor:</span>{" "}
                       {g.instructor}
                     </div>
-                    <div className="text-xs text-slate-500">
-                      Last activity: {g.lastActivity}
-                    </div>
+                    <div className="text-xs text-slate-500"></div>
                   </div>
 
                   {/* Progress */}
@@ -410,7 +433,7 @@ export default function Page() {
         </div>
 
         {/* Empty state */}
-        {filteredGroups.length === 0 && (
+        {filteredGroups?.length === 0 && (
           <div className="mt-12 text-center">
             <div className="mx-auto mb-4 grid h-24 w-24 place-items-center rounded-full bg-slate-100">
               <Users size={40} className="text-slate-400" />

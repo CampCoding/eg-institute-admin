@@ -2,13 +2,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { useRouter } from "next/navigation";
-import { Bookmark, Trash, Edit, Eye } from "lucide-react";
+import { Bookmark, Trash, Edit, Eye, Loader2, EyeClosed } from "lucide-react";
 import DeleteModal from "../../components/DeleteModal/DeleteModal";
 import axios from "axios";
 import { BASE_URL } from "../../utils/base_url";
 import useDeleteBlog from "../../utils/Api/Blogs/DeleteBlog";
 import toast from "react-hot-toast";
-import Toggle from "../../utils/Api/Toggle";
+import { Toggle } from "../../utils/Api/Toggle";
+import useGetBlogs from "../../utils/Api/Blogs/GetAllBlogs";
+import { useQueryClient } from "@tanstack/react-query";
 
 // If you have a real blogs file, import it and remove the mock below.
 // import { blogs as initialBlogs } from "@/utils/blogs";
@@ -82,32 +84,23 @@ const initialBlogs = [
 
 export default function BlogsPage() {
   const router = useRouter();
+  const {
+    data: blogs = initialBlogs,
+    isLoading,
+    isError,
+    error,
+  } = useGetBlogs();
 
   // live blogs list (initial + localStorage drafts, de-duplicated by id)
-  const [blogs, setBlogs] = useState([]);
+  const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+
   const [selectedBlog, setSelectedBlog] = useState(null);
 
   // hydrate from localStorage on mount
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      const drafts = JSON.parse(localStorage.getItem("blogDrafts") || "[]");
-      if (Array.isArray(drafts) && drafts.length) {
-        const map = new Map(initialBlogs.map((b) => [b.id, b]));
-        drafts.forEach((d) => map.set(d.id, d)); // prefer drafts when ids collide
-        setBlogs(Array.from(map.values()));
-      } else {
-        setBlogs(initialBlogs);
-      }
-    } catch {
-      setBlogs(initialBlogs);
-    }
-  }, []);
 
   // filter
   const filteredBlogs = useMemo(() => {
@@ -195,75 +188,32 @@ export default function BlogsPage() {
       ? "border-[3px] border-teal-500 shadow-[0_8px_50px_-12px_rgba(20,184,166,0.35)]"
       : "border border-slate-200";
 
-  const formatcreated_at = (iso) =>
-    new created_at(iso).toLocalecreated_atString(undefined, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
   const accessToken = localStorage.getItem("AccessToken");
 
-  const getBlogs = async () => {
-    if (!accessToken) {
-      setError("You are not authorized. Please log in.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await axios.get(`${BASE_URL}/blogs/select_blogs.php`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.data.status === "success") {
-        setBlogs(response.data.message || []);
-      } else {
-        setError(response.data.message || "Failed to load blogs");
-        console.warn("API Warning:", response.data);
-      }
-    } catch (err) {
-      if (err.code === "ECONNABORTED") {
-        setError("Request timeout. Please try again.");
-      } else if (err.response?.status === 401) {
-        setError("Session expired. Please log in again.");
-        localStorage.removeItem("AccessToken");
-        window.location.href = "/login";
-      } else if (err.response?.status === 403) {
-        setError("Access forbidden.");
-      } else {
-        setError(
-          err.response?.data?.message || "Network error. Check your connection."
-        );
-      }
-      console.error("Error fetching blogs:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    getBlogs();
-  }, []);
   const handleToggleBlog = async (id) => {
     const response = await Toggle({
       payload: { blog_id: id },
       url: "blogs/toggle_blog.php",
+      queryClient,
+      key: "blogs",
     });
     if (response.status === "success") {
       toast.success(response.message);
     }
   };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="inline-flex items-center gap-2 text-slate-600">
+          <Loader2 className="animate-spin" /> Loading blogs.....
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
-      <BreadCrumb title="All Blogs" child="Blog" parent="Home" />
+      <BreadCrumb title="All Blogs" child="Blogs" parent="Home" />
 
       {/* Search */}
       <div className="mt-4 w-full">
@@ -432,7 +382,7 @@ export default function BlogsPage() {
                   className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
                   aria-label="Delete blog"
                 >
-                  <Eye size={18} />
+                  {b?.hidden == 0 ? <EyeClosed size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>

@@ -2,72 +2,84 @@
 "use client";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import React from "react";
+import useGetTeacherById from "../../../../utils/Api/Teachers/GetTeacherById";
 
 export default function InstructorProfile({ instructor }) {
   const router = useRouter();
-  const data = instructor || {
-    id: 12,
-    name: "Ms. Sara Al-Masri",
-    avatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=512&auto=format&fit=crop",
-    email: "sara.almasri@academy.com",
-    phone: "+20 100 234 5678",
-    status: "Active",
-    role: "Arabic Instructor",
-    experienceYears: 7,
-    specialties: ["MSA (الفصحى)", "Conversation", "Grammar", "Tajwīd basics"],
-    langs: ["Arabic (Native)", "English (C1)", "French (B1)"],
-    hourlyRate: 25,
-    bio: "Dedicated Arabic educator focusing on communicative approaches for non-native learners. Passionate about pronunciation, rhythm, and confidence-building.",
-    rating: 4.8,
-    satisfaction: 96,
-    studentsCount: 124,
-    classesCount: 18,
-    lessonsTaught: 1420,
-    attendance: 98,
-    availability: [
-      { day: "Mon", slots: ["10:00–12:00", "15:00–17:00"] },
-      { day: "Tue", slots: ["11:00–14:00"] },
-      { day: "Wed", slots: ["09:00–12:00"] },
-      { day: "Thu", slots: ["13:00–16:00"] },
-      { day: "Fri", slots: ["Off"] },
-    ],
-    courses: [
-      {
-        id: "A101",
-        title: "Arabic for Beginners (A1)",
-        level: "A1",
-        enrolled: 42,
-        progress: 78,
-        nextLesson: "Unit 5 – Pronouns",
-      },
-      {
-        id: "A202",
-        title: "Modern Standard Arabic – Intermediate",
-        level: "B1",
-        enrolled: 31,
-        progress: 52,
-        nextLesson: "Reading: News Headlines",
-      },
-      {
-        id: "C110",
-        title: "Colloquial Egyptian – Survival",
-        level: "A2",
-        enrolled: 28,
-        progress: 64,
-        nextLesson: "Shopping Dialogues",
-      },
-    ],
-    reviews: [
-      { name: "Michael", rating: 5, text: "Clear explanations and patient." },
-      { name: "Aisha", rating: 5, text: "Great pronunciation drills!" },
-      { name: "Leo", rating: 4, text: "Engaging and structured lessons." },
-    ],
-    notes:
-      "Excellent learner feedback; consider adding weekly writing prompts to B1 class.",
-  };
+  const { id } = useParams();
+
+  const { data: teacher } = useGetTeacherById({ id });
+  console.log(teacher);
+
+    const data = instructor || {
+      id: teacher?.message?.teacher_id,
+      name: teacher?.message?.teacher_name,
+      avatar:
+        teacher?.message?.teacher_image ||
+        "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=1400&auto=format&fit=crop",
+      email: teacher?.message?.teacher_email,
+      phone: teacher?.message?.phone,
+      status: "Active",
+      role: "Arabic Instructor",
+      experienceYears: 7,
+      specialties: ["MSA (الفصحى)", "Conversation", "Grammar", "Tajwīd basics"],
+      langs: teacher?.message?.languages || [
+        "Arabic (Native)",
+        "English (C1)",
+        "French (B1)",
+      ],
+      hourlyRate: teacher?.message?.hourly_rate,
+      bio: teacher?.message?.bio,
+      rating: teacher?.message?.rate,
+      satisfaction: 96,
+      studentsCount: teacher?.message?.student_count,
+      classesCount: 18,
+      lessonsTaught: 1420,
+      attendance: 98,
+      availability: [
+        { day: "Mon", slots: ["10:00–12:00", "15:00–17:00"] },
+        { day: "Tue", slots: ["11:00–14:00"] },
+        { day: "Wed", slots: ["09:00–12:00"] },
+        { day: "Thu", slots: ["13:00–16:00"] },
+        { day: "Fri", slots: ["Off"] },
+      ],
+      courses: [
+        {
+          id: "A101",
+          title: "Arabic for Beginners (A1)",
+          level: "A1",
+          enrolled: 42,
+          progress: 78,
+          nextLesson: "Unit 5 – Pronouns",
+        },
+        {
+          id: "A202",
+          title: "Modern Standard Arabic – Intermediate",
+          level: "B1",
+          enrolled: 31,
+          progress: 52,
+          nextLesson: "Reading: News Headlines",
+        },
+        {
+          id: "C110",
+          title: "Colloquial Egyptian – Survival",
+          level: "A2",
+          enrolled: 28,
+          progress: 64,
+          nextLesson: "Shopping Dialogues",
+        },
+      ],
+      reviews: [
+        { name: "Michael", rating: 5, text: "Clear explanations and patient." },
+        { name: "Aisha", rating: 5, text: "Great pronunciation drills!" },
+        { name: "Leo", rating: 4, text: "Engaging and structured lessons." },
+      ],
+      notes:
+        "Excellent learner feedback; consider adding weekly writing prompts to B1 class.",
+    };
+  console.log(teacher);
 
   const Pill = ({ children, tone = "default" }) => {
     const tones = {
