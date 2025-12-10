@@ -146,6 +146,7 @@ export default function AddTeacherPage() {
     if (preview.level === "Intermediate") return "text-blue-700";
     return "text-teal-700";
   }, [preview.level]);
+  
   const onSubmit = async (values) => {
     const payload = {
       teacher_name: values.name, // أو values.teacher_name لو نفس الاسم

@@ -12,10 +12,14 @@ async function fetchStudents() {
   return res.data;
 }
 
+
+
+
+
 export default function useGetAllTeachers() {
   return useQuery({
     queryKey: ["teachers"],
-    queryFn: fetchStudents,
+    queryFn: fetchStudents ,
     refetchOnWindowFocus: false,
     retry: 1,
     enabled:

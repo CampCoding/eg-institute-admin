@@ -1,15 +1,20 @@
 "use client";
 
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { courses as seedCourses } from "@/utils/data";
 import { useRouter } from "next/navigation";
 import { Trash, Pencil } from "lucide-react";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
+import axios from "axios";
+import { BASE_URL } from "@/utils/base_url";
+import { Spin } from "antd";
 
 export default function CoursesPage() {
   const router = useRouter();
+  const [allCoursesLoading , setAllCoursesLoading] = useState(false);
+  const [allCoursesData , setAllCoursesData] = useState([]);
 
   // Start from provided dataset (no localStorage merge)
   const [data, setData] = useState(seedCourses);
@@ -17,23 +22,58 @@ export default function CoursesPage() {
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
 
+  function handleGetAllCourses() {
+    const token = localStorage.getItem("AccessToken");
+    try{  
+     setAllCoursesLoading(true);
+     axios.get(BASE_URL+"/courses/select_live_courses.php",{
+        headers : {
+          "Authorization" :`Bearer ${token}`
+        }
+     })
+     .then(res => {
+      if(res?.data?.status == "success") {
+        setAllCoursesData(res?.data?.message);
+      }
+     }).catch(e => console.log(e))
+     .finally(() => setAllCoursesLoading(false))
+    }catch(err) {
+      console.log(err)
+    }
+  }
+
+  useEffect(() => {
+    handleGetAllCourses();
+  } , [])
+
   const filtered = useMemo(() => {
     const q = (searchTerm || "").trim().toLowerCase();
-    if (!q) return data;
-    return data.filter(
+    if (!q) return allCoursesData;
+    return allCoursesData?.filter(
       (c) =>
-        c?.title?.toLowerCase().includes(q) ||
-        c?.description?.toLowerCase().includes(q) ||
-        c?.teacher?.toLowerCase().includes(q) ||
+        c?.course_name?.toLowerCase().includes(q) ||
+        c?.course_descreption?.toLowerCase().includes(q) ||
         c?.level?.toLowerCase().includes(q)
     );
-  }, [data, searchTerm]);
+  }, [allCoursesData, searchTerm]);
 
   function handleDelete() {
     if (!selectedCourse) return;
     setData((prev) => prev.filter((c) => String(c.id) !== String(selectedCourse.id)));
     setOpenDeleteModal(false);
     setSelectedCourse(null);
+  }
+
+  useEffect(() => {
+    console.log(filtered)
+  } , [filtered])
+
+  if(allCoursesLoading){
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Spin size="large" spinning/>
+      </div>
+    )
   }
 
   return (
@@ -60,7 +100,7 @@ export default function CoursesPage() {
 
       {/* Grid */}
       <div className="grid mt-5 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((c) => (
+        {filtered?.map((c) => (
           <article
             key={c.id}
             className="group relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
@@ -73,8 +113,8 @@ export default function CoursesPage() {
             <div className="relative h-44 overflow-hidden">
               {c.video ? (
                 <video
-                  src={c.video}
-                  poster={c.poster}
+                  src={c?.video}
+                  poster={c?.image}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   autoPlay
                   muted
@@ -85,30 +125,30 @@ export default function CoursesPage() {
               ) : (
                 <img
                   src={
-                    c.poster ||
+                    c?.image ||
                     "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1400&auto=format&fit=crop"
                   }
-                  alt={c.title}
+                  alt={c?.course_name}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   loading="lazy"
                 />
               )}
-              <div className={`absolute inset-0 bg-gradient-to-r ${c.color} opacity-25`} />
+              {/* <div className={`absolute inset-0 bg-gradient-to-r ${c?.color} opacity-25`} /> */}
 
               {/* Badges */}
               <div className="absolute top-3 left-3 flex gap-2">
                 <span className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200">
-                  {c.level}
+                  {c?.level}
                 </span>
                 <span className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200">
-                  {c.duration}
+                  {c?.Duration}
                 </span>
-                {Array.isArray(c.units) && c.units.length > 0 && (
+                {Array.isArray(c?.lessons) && c?.lessons?.length > 0 && (
                   <span
                     className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200"
-                    title={`${c.units.length} units`}
+                    title={`${c?.lessons?.length} units`}
                   >
-                    {c.units.length} units
+                    {c?.lessons?.length} units
                   </span>
                 )}
               </div>
@@ -117,9 +157,9 @@ export default function CoursesPage() {
             {/* Body */}
             <div className="p-4">
               <h2 className="text-base sm:text-lg font-semibold tracking-tight line-clamp-1">
-                {c.title}
+                {c?.course_name}
               </h2>
-              <p className="mt-1 text-slate-600 text-sm line-clamp-2">{c.description}</p>
+              <p className="mt-1 text-slate-600 text-sm line-clamp-2">{c?.course_descreption}</p>
 
               <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
                 <div className="flex items-center gap-3">
@@ -127,9 +167,9 @@ export default function CoursesPage() {
                     <svg viewBox="0 0 24 24" className="h-4 w-4">
                       <path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" />
                     </svg>
-                    {c.lessons} lessons
+                    {c?.lessons} lessons
                   </span>
-                  <span className="inline-flex items-center gap-1">
+                  {/* <span className="inline-flex items-center gap-1">
                     <svg viewBox="0 0 24 24" className="h-4 w-4">
                       <path
                         fill="currentColor"
@@ -137,9 +177,9 @@ export default function CoursesPage() {
                       />
                     </svg>
                     {c.teacher}
-                  </span>
+                  </span> */}
                 </div>
-                <span className="font-semibold text-[var(--text-color)]">{c.price}</span>
+                <span className="font-semibold text-[var(--text-color)]">{c?.price}</span>
               </div>
 
               {/* Actions */}

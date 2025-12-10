@@ -7,6 +7,9 @@ import { Loader2, Save, Plus, X, ArrowLeft, Upload, Play } from "lucide-react";
 import { Upload as AntUpload, Progress, Radio, message } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { teachers } from "@/utils/data";
+import axios from "axios";
+import { BASE_URL } from "@/utils/base_url";
+import toast from "react-hot-toast";
 
 const { Dragger } = AntUpload;
 
@@ -21,37 +24,37 @@ const GRADIENTS = [
 
 export default function AddCoursePage() {
   const router = useRouter();
+  const [addLoading, setAddLoading] = useState(false);
 
   const [form, setForm] = useState({
-    title: "",
-    description: "",
-    longDescription: "",
-    level: LEVELS[0],
-    duration: "12 weeks",
-    lessons: 12,
-    teacher: teachers?.[0]?.name || "Unknown",
-    price: "$149",
+    course_name: "",
+    course_description: "",
+    overview: "",
+    level: "Beginner",
+    Duration: "12 weeks",
+    lessons: "12",
+    price: "50",
+    image: "",
     video: "",
-    poster: "",
-    color: GRADIENTS[0],
-    // New advertising video fields
-    advertisingVideoType: "url", // 'url' or 'upload'
-    advertisingVideoUrl: "",
-    advertisingVideoFile: null,
+    advertising_video: "",
+    type: "Online",
+    hidden: "0"
   });
 
-  // Overview "What you'll learn" + feature cards
-  const [learnItems, setLearnItems] = useState([
+  // Overview "What you'll learn" - API expects a string, not array
+  const [wiil_learn, setWiilLearn] = useState([
     "Read and write Arabic script fluently",
     "Engage in everyday Egyptian conversations",
   ]);
-  const [features, setFeatures] = useState([
-    { title: "Interactive Dialogues", subtitle: "Real-life conversations" },
-    { title: "Audio Lessons", subtitle: "Native pronunciation" },
-    { title: "Writing Practice", subtitle: "Script mastery" },
+  
+  // Features - API expects a string, not array of objects
+  const [feature, setFeature] = useState([
+    "Interactive Dialogues",
+    "Audio Lessons with native pronunciation",
+    "Writing Practice for script mastery",
   ]);
 
-  // Free trials list
+  // Free trials list (not in API, keep for UI only)
   const [freeTrials, setFreeTrials] = useState([
     {
       id: "ft-1",
@@ -63,7 +66,7 @@ export default function AddCoursePage() {
     },
   ]);
 
-  // Units / Chapters (used for Course Content)
+  // Chapters (for UI only, not in API)
   const [chapters, setChapters] = useState([
     { title: "Introduction", duration: "05:00" },
   ]);
@@ -71,102 +74,114 @@ export default function AddCoursePage() {
   const [saving, setSaving] = useState(false);
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [videoUploading, setVideoUploading] = useState(false);
-  const valid = useMemo(() => !!form.title && !!form.description, [form]);
+  const [imageFile, setImageFile] = useState(null);
+  const [videoFile, setVideoFile] = useState(null);
+  const [advertisingVideoFile, setAdvertisingVideoFile] = useState(null);
+
+  const valid = useMemo(() => !!form.course_name && !!form.course_description, [form]);
 
   const onChange = (key, val) => setForm((s) => ({ ...s, [key]: val }));
 
-  // Video upload handlers
+  // File upload handlers
+  const uploadFile = async (file, endpoint, fieldName) => {
+    const formData = new FormData();
+    formData.append(fieldName, file);
+    
+    try {
+      const token = localStorage.getItem("AccessToken");
+      const response = await axios.post(`${BASE_URL}/${endpoint}`, formData, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "multipart/form-data"
+        }
+      });
+      
+      if (response?.data?.status === "success") {
+        return response.data.url; // Assuming API returns { status: "success", url: "path/to/file" }
+      }
+      throw new Error("Upload failed");
+    } catch (error) {
+      console.error(`Error uploading ${fieldName}:`, error);
+      toast.error(`Failed to upload ${fieldName}`);
+      return null;
+    }
+  };
+
+  // Image upload handler
+  const handleImageUpload = async (file) => {
+    const isImage = file.type.startsWith("image/");
+    if (!isImage) {
+      toast.error("You can only upload image files!");
+      return false;
+    }
+
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      toast.error("Image must be smaller than 5MB!");
+      return false;
+    }
+
+    setImageFile(file);
+    
+    // For preview
+    const imageUrl = URL.createObjectURL(file);
+    onChange("image", imageUrl);
+    
+    return false; // Prevent default upload
+  };
+
+  // Video upload handler
+  const handleVideoUpload = async (file, type) => {
+    const isVideo = file.type.startsWith("video/");
+    if (!isVideo) {
+      toast.error("You can only upload video files!");
+      return false;
+    }
+
+    const isLt500M = file.size / 1024 / 1024 < 500;
+    if (!isLt500M) {
+      toast.error("Video must be smaller than 500MB!");
+      return false;
+    }
+
+    if (type === "main") {
+      setVideoFile(file);
+      const videoUrl = URL.createObjectURL(file);
+      onChange("video", videoUrl);
+    } else if (type === "advertising") {
+      setAdvertisingVideoFile(file);
+      const videoUrl = URL.createObjectURL(file);
+      onChange("advertising_video", videoUrl);
+    }
+
+    return false;
+  };
+
+  // Video type change handler
   const handleVideoTypeChange = (e) => {
     setForm((prev) => ({
       ...prev,
       advertisingVideoType: e.target.value,
-      advertisingVideoUrl: "",
-      advertisingVideoFile: null,
+      advertising_video: "",
     }));
-    setVideoUploadProgress(0);
-    setVideoUploading(false);
+    setAdvertisingVideoFile(null);
   };
 
-  const handleVideoUpload = (file) => {
-    // Validate file type
-    const isVideo = file.type.startsWith("video/");
-    if (!isVideo) {
-      message.error("You can only upload video files!");
-      return false;
-    }
-
-    // Validate file size (500MB limit)
-    const isLt500M = file.size / 1024 / 1024 < 500;
-    if (!isLt500M) {
-      message.error("Video must be smaller than 500MB!");
-      return false;
-    }
-
-    // Start upload simulation
-    setVideoUploading(true);
-    setVideoUploadProgress(0);
-
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setVideoUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(interval);
-          return 90;
-        }
-        return prev + Math.random() * 10;
-      });
-    }, 300);
-
-    // Simulate upload completion
-    setTimeout(() => {
-      clearInterval(interval);
-      setVideoUploadProgress(100);
-      setVideoUploading(false);
-
-      // Store the file in form data
-      setForm((prev) => ({
-        ...prev,
-        advertisingVideoFile: file,
-      }));
-
-      message.success(`${file.name} uploaded successfully!`);
-    }, 3000);
-
-    // Prevent default upload behavior
-    return false;
-  };
-
-  const removeUploadedVideo = () => {
-    setForm((prev) => ({
-      ...prev,
-      advertisingVideoFile: null,
-    }));
-    setVideoUploadProgress(0);
-    setVideoUploading(false);
-  };
-
-  const uploadProps = {
-    name: "video",
-    multiple: false,
-    accept: "video/*",
-    showUploadList: false,
-    beforeUpload: handleVideoUpload,
-  };
-
-  // Other handlers
-  const addLearn = () => setLearnItems((s) => [...s, ""]);
+  // Will Learn handlers
+  const addLearn = () => setWiilLearn((s) => [...s, ""]);
   const updateLearn = (i, v) =>
-    setLearnItems((s) => s.map((x, idx) => (idx === i ? v : x)));
+    setWiilLearn((s) => s.map((x, idx) => (idx === i ? v : x)));
   const removeLearn = (i) =>
-    setLearnItems((s) => s.filter((_, idx) => idx !== i));
+    setWiilLearn((s) => s.filter((_, idx) => idx !== i));
 
-  const addFeature = () =>
-    setFeatures((s) => [...s, { title: "", subtitle: "" }]);
-  const updateFeature = (i, key, v) =>
-    setFeatures((s) => s.map((f, idx) => (idx === i ? { ...f, [key]: v } : f)));
+  // Feature handlers
+  const addFeature = () => setFeature((s) => [...s, ""]);
+  const updateFeature = (i, v) =>
+    setFeature((s) => s.map((x, idx) => (idx === i ? v : x)));
   const removeFeature = (i) =>
-    setFeatures((s) => s.filter((_, idx) => idx !== i));
+    setFeature((s) => s.filter((_, idx) => idx !== i));
 
+  // UI-only handlers (free trials, chapters - not sent to API)
   const addTrial = () =>
     setFreeTrials((s) => [
       ...s,
@@ -195,95 +210,129 @@ export default function AddCoursePage() {
       s.map((c, idx) => (idx === i ? { ...c, [key]: val } : c))
     );
 
+  // Instructor (not in API, keep for UI if needed)
   const [instructor, setInstructor] = useState({
     name: teachers?.[0]?.name || "Ahmed Hassan",
     role: "Native Egyptian Arabic Teacher & Cultural Expert",
     bio: "",
-    avatarBg: "#0ea5a6",
   });
-
-  const [reviews] = useState([]); // optional to pre-seed
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!valid) return;
 
     setSaving(true);
-
-    // Create FormData for file upload
-    const formData = new FormData();
-
-    const payload = {
-      ...form,
-      id: `course-${Date.now()}`,
-      overview: {
-        whatYouWillLearn: learnItems.filter(Boolean),
-        features: features.filter((f) => f.title || f.subtitle),
-      },
-      freeTrials: freeTrials.filter((t) => t.title),
-      // units for "Course Content" tab
-      units: chapters.map((c, i) => ({
-        unitId: `u-${i + 1}`,
-        name: c.title || `Unit ${i + 1}`,
-        unitNumber: i + 1,
-        lessonsCount: Math.max(
-          1,
-          Number((c.duration || "0").split(":")[0]) || 2
-        ), // a tiny heuristic
-        videos: form.video ? [form.video] : [],
-        pdfs: [],
-      })),
-      // keep "sections" too if you use it elsewhere
-      sections: [
-        {
-          id: `sec-${Date.now()}`,
-          title: "Course Content",
-          lessons: chapters.map((c, i) => ({
-            id: `lesson-${i + 1}`,
-            title: c.title || `Lesson ${i + 1}`,
-            duration: c.duration || "00:00",
-            videoUrl: form.video || "",
-          })),
-        },
-      ],
-      instructor,
-      reviews,
-    };
-
-    // Add all form fields to FormData
-    Object.keys(payload).forEach((key) => {
-      if (key === "advertisingVideoFile" && form.advertisingVideoFile) {
-        formData.append("advertisingVideo", form.advertisingVideoFile);
-      } else if (key !== "advertisingVideoFile") {
-        formData.append(
-          key,
-          typeof payload[key] === "object"
-            ? JSON.stringify(payload[key])
-            : payload[key]
-        );
-      }
-    });
+    setAddLoading(true);
 
     try {
-      if (typeof window !== "undefined") {
-        const drafts = JSON.parse(localStorage.getItem("courseDrafts") || "[]");
-        localStorage.setItem(
-          "courseDrafts",
-          JSON.stringify([payload, ...drafts])
-        );
+      // Upload files first if they exist
+      let imageUrl = form.image;
+      let videoUrl = form.video;
+      let advertisingVideoUrl = form.advertising_video;
+
+      // Upload image file
+      if (imageFile && typeof imageFile === 'object') {
+        const uploadedImageUrl = await uploadFile(imageFile, 'upload_image.php', 'image');
+        if (uploadedImageUrl) imageUrl = uploadedImageUrl;
       }
 
-      console.log("Creating course:", payload);
-      console.log("Uploaded video file:", form.advertisingVideoFile);
+      // Upload main video file
+      if (videoFile && typeof videoFile === 'object') {
+        const uploadedVideoUrl = await uploadFile(videoFile, 'upload_video.php', 'video');
+        if (uploadedVideoUrl) videoUrl = uploadedVideoUrl;
+      }
 
-      router.push("/courses");
+      // Upload advertising video file
+      if (advertisingVideoFile && typeof advertisingVideoFile === 'object') {
+        const uploadedAdVideoUrl = await uploadFile(advertisingVideoFile, 'upload_video.php', 'video');
+        if (uploadedAdVideoUrl) advertisingVideoUrl = uploadedAdVideoUrl;
+      }
+
+      // Prepare payload according to API structure
+      const payload = {
+        type: form.type || "Online",
+        course_name: form.course_name,
+        course_description: form.course_description,
+        overview: form.overview,
+        level: form.level,
+        Duration: form.Duration,
+        lessons: form.lessons.toString(), // API expects string
+        price: form.price,
+        image: imageUrl,
+        video: videoUrl,
+        advertising_video: advertisingVideoUrl,
+        wiil_learn: wiil_learn?.filter(Boolean).join(", "), // Convert array to string
+        feature: feature.filter(Boolean).join(", "), // Convert array to string
+        hidden: form.hidden || "0"
+        // Note: created_at should be handled by the API/server
+      };
+
+      console.log("Sending payload:", payload);
+
+      const token = localStorage.getItem("AccessToken");
+      const response = await axios.post(
+        `${BASE_URL}/courses/add_course.php`,
+        payload,
+        {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+     console.log(response);
+      if (response?.data?.status === "success") {
+        toast.success(response.data.message || "Course added successfully!");
+        
+        // Refresh courses list if needed
+        try {
+          await axios.get(`${BASE_URL}/courses/select_live_courses.php`, {
+            headers: {
+              "Authorization": `Bearer ${token}`
+            }
+          });
+        } catch (refreshError) {
+          console.log("Refresh courses error:", refreshError);
+        }
+        
+        // Reset form and redirect
+        setForm({
+          course_name: "",
+          course_description: "",
+          overview: "",
+          level: "Beginner",
+          Duration: "12 weeks",
+          lessons: "12",
+          price: "50",
+          image: "",
+          video: "",
+          advertising_video: "",
+          type: "Online",
+          hidden: "0"
+        });
+        setWiilLearn(["Read and write Arabic script fluently", "Engage in everyday Egyptian conversations"]);
+        setFeature(["Interactive Dialogues", "Audio Lessons with native pronunciation", "Writing Practice for script mastery"]);
+        setImageFile(null);
+        setVideoFile(null);
+        setAdvertisingVideoFile(null);
+        
+        // Redirect to courses page
+        router.push("/courses");
+      } else {
+        toast.error(response?.data?.message || "Failed to add course");
+      }
     } catch (err) {
-      console.error(err);
-      message.error("Failed to save course. Check console for details.");
+      console.error("Error adding course:", err);
+      toast.error(err.response?.data?.message || "An error occurred while adding the course");
     } finally {
       setSaving(false);
+      setAddLoading(false);
     }
   };
+
+  // Input styling
+  const inputClass = "mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]";
+  const labelClass = "text-sm font-medium";
 
   return (
     <div className="min-h-screen">
@@ -317,49 +366,45 @@ export default function AddCoursePage() {
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <label className="text-sm font-medium">Title</label>
+                  <label className={labelClass}>Course Name</label>
                   <input
-                    value={form.title}
-                    onChange={(e) => onChange("title", e.target.value)}
+                    value={form.course_name}
+                    onChange={(e) => onChange("course_name", e.target.value)}
                     placeholder="e.g., Egyptian Arabic Complete Course"
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                    className={inputClass}
+                    required
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-sm font-medium">
-                    Short Description
-                  </label>
+                  <label className={labelClass}>Short Description</label>
                   <textarea
-                    value={form.description}
-                    onChange={(e) => onChange("description", e.target.value)}
+                    value={form.course_description}
+                    onChange={(e) => onChange("course_description", e.target.value)}
                     rows={3}
                     placeholder="A short overview that appears on cards."
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                    className={inputClass}
+                    required
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-sm font-medium">
-                    Long Overview (details page)
-                  </label>
+                  <label className={labelClass}>Long Overview (details page)</label>
                   <textarea
-                    value={form.longDescription}
-                    onChange={(e) =>
-                      onChange("longDescription", e.target.value)
-                    }
+                    value={form.overview}
+                    onChange={(e) => onChange("overview", e.target.value)}
                     rows={5}
                     placeholder="In-depth course overview for the details page."
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                    className={inputClass}
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Level</label>
+                  <label className={labelClass}>Level</label>
                   <select
                     value={form.level}
                     onChange={(e) => onChange("level", e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)] bg-white"
+                    className={inputClass}
                   >
                     {LEVELS.map((l) => (
                       <option key={l} value={l}>
@@ -370,76 +415,122 @@ export default function AddCoursePage() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Duration</label>
+                  <label className={labelClass}>Duration</label>
                   <input
-                    value={form.duration}
-                    onChange={(e) => onChange("duration", e.target.value)}
+                    value={form.Duration}
+                    onChange={(e) => onChange("Duration", e.target.value)}
                     placeholder="e.g., 12 weeks"
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                    className={inputClass}
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Lessons</label>
+                  <label className={labelClass}>Lessons</label>
                   <input
                     type="number"
-                    min={1}
+                    min="1"
                     value={form.lessons}
-                    onChange={(e) =>
-                      onChange("lessons", Number(e.target.value))
-                    }
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                    onChange={(e) => onChange("lessons", e.target.value)}
+                    className={inputClass}
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Teacher</label>
+                  <label className={labelClass}>Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.price}
+                    onChange={(e) => onChange("price", e.target.value)}
+                    placeholder="50"
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Type</label>
                   <select
-                    value={form.teacher}
-                    onChange={(e) => onChange("teacher", e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)] bg-white"
+                    value={form.type}
+                    onChange={(e) => onChange("type", e.target.value)}
+                    className={inputClass}
                   >
-                    {teachers?.map((teach) => (
-                      <option key={teach?.id} value={teach?.name ?? teach?.id}>
-                        {teach?.name}
-                      </option>
-                    ))}
+                    <option value="Online">Online</option>
+                    <option value="Offline">Offline</option>
+                    <option value="Hybrid">Hybrid</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium">Price</label>
-                  <input
-                    value={form.price}
-                    onChange={(e) => onChange("price", e.target.value)}
-                    placeholder="$149"
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                  />
+                <div className="sm:col-span-2">
+                  <label className={labelClass}>Image URL or Upload</label>
+                  <div className="flex gap-2">
+                    <input
+                      value={form.image}
+                      onChange={(e) => onChange("image", e.target.value)}
+                      placeholder="https://images.unsplash.com/..."
+                      className={`${inputClass} flex-1`}
+                    />
+                    <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer">
+                      <Upload size={16} />
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {imageFile && (
+                    <p className="text-sm text-green-600 mt-1">
+                      Image selected: {imageFile.name}
+                    </p>
+                  )}
                 </div>
 
-                <div className="sm:col-span-2 grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">
-                      Video URL (optional)
-                    </label>
+                <div>
+                  <label className={labelClass}>Main Video URL or Upload</label>
+                  <div className="flex gap-2">
                     <input
                       value={form.video}
                       onChange={(e) => onChange("video", e.target.value)}
                       placeholder="https://cdn.example.com/intro.mp4"
-                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                      className={`${inputClass} flex-1`}
                     />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">
-                      Poster Image URL
+                    <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer">
+                      <Upload size={16} />
+                      Upload
+                      <input
+                        type="file"
+                        accept="video/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleVideoUpload(file, "main");
+                        }}
+                      />
                     </label>
-                    <input
-                      value={form.poster}
-                      onChange={(e) => onChange("poster", e.target.value)}
-                      placeholder="https://images.unsplash.com/..."
-                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                    />
                   </div>
+                  {videoFile && (
+                    <p className="text-sm text-green-600 mt-1">
+                      Video selected: {videoFile.name}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={labelClass}>Status</label>
+                  <select
+                    value={form.hidden}
+                    onChange={(e) => onChange("hidden", e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="0">Visible</option>
+                    <option value="1">Hidden</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -451,131 +542,50 @@ export default function AddCoursePage() {
                 Advertising Video
               </h2>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-3">
-                    Video Source
-                  </label>
-                  <Radio.Group
-                    value={form.advertisingVideoType}
-                    onChange={handleVideoTypeChange}
-                    className="space-x-6"
-                  >
-                    <Radio value="url">Video URL</Radio>
-                    <Radio value="upload">Upload Video</Radio>
-                  </Radio.Group>
-                </div>
-
-                {form.advertisingVideoType === "url" && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Video URL
-                    </label>
+              <div>
+                <label className={labelClass}>Advertising Video URL or Upload</label>
+                <div className="flex gap-2">
+                  <input
+                    value={form.advertising_video}
+                    onChange={(e) => onChange("advertising_video", e.target.value)}
+                    placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
+                    className={`${inputClass} flex-1`}
+                  />
+                  <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer">
+                    <Upload size={16} />
+                    Upload
                     <input
-                      type="url"
-                      name="advertisingVideoUrl"
-                      value={form.advertisingVideoUrl}
-                      onChange={(e) =>
-                        onChange("advertisingVideoUrl", e.target.value)
-                      }
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent"
-                      placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
+                      type="file"
+                      accept="video/*"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleVideoUpload(file, "advertising");
+                      }}
                     />
-                    <p className="text-sm text-slate-500 mt-2">
-                      Supported: YouTube, Vimeo, or direct video file URLs
-                    </p>
-                  </div>
+                  </label>
+                </div>
+                {advertisingVideoFile && (
+                  <p className="text-sm text-green-600 mt-1">
+                    Advertising video selected: {advertisingVideoFile.name}
+                  </p>
                 )}
-
-                {form.advertisingVideoType === "upload" && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Upload Video File
-                    </label>
-
-                    {!form.advertisingVideoFile && (
-                      <Dragger
-                        {...uploadProps}
-                        className="border-2 border-dashed border-slate-300 rounded-xl hover:border-[var(--primary-color)]"
-                      >
-                        <p className="ant-upload-drag-icon">
-                          <InboxOutlined
-                            style={{ fontSize: "48px", color: "#9ca3af" }}
-                          />
-                        </p>
-                        <p className="ant-upload-text text-lg font-medium text-slate-700">
-                          Click or drag video file to this area to upload
-                        </p>
-                        <p className="ant-upload-hint text-slate-500">
-                          Support for MP4, AVI, MOV, WMV formats. Maximum file
-                          size: 500MB
-                        </p>
-                      </Dragger>
-                    )}
-
-                    {videoUploading && (
-                      <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-medium text-blue-700">
-                            Uploading video...
-                          </span>
-                          <span className="text-sm text-blue-600">
-                            {Math.round(videoUploadProgress)}%
-                          </span>
-                        </div>
-                        <Progress
-                          percent={videoUploadProgress}
-                          status="active"
-                          strokeColor="#3b82f6"
-                          className="mb-2"
-                        />
-                      </div>
-                    )}
-
-                    {form.advertisingVideoFile && !videoUploading && (
-                      <div className="mt-4 p-4 bg-green-50 rounded-xl border border-green-200">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Play className="w-5 h-5 text-green-600" />
-                            <div>
-                              <p className="font-medium text-green-900">
-                                {form.advertisingVideoFile.name}
-                              </p>
-                              <p className="text-sm text-green-700">
-                                {(
-                                  form.advertisingVideoFile.size /
-                                  (1024 * 1024)
-                                ).toFixed(2)}{" "}
-                                MB
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={removeUploadedVideo}
-                            className="p-1 rounded-full hover:bg-green-200 transition-colors"
-                          >
-                            <X className="w-4 h-4 text-green-600" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <p className="text-sm text-slate-500 mt-2">
+                  Supported: YouTube, Vimeo, or direct video file URLs
+                </p>
               </div>
             </div>
 
-            {/* What you'll learn & features */}
+            {/* What you'll learn */}
             <div className="rounded-2xl bg-white border border-slate-200 p-5">
-              <h2 className="text-lg font-semibold">Overview Section</h2>
+              <h2 className="text-lg font-semibold">What You'll Learn</h2>
               <p className="text-sm text-slate-600 mt-1">
-                What students learn & course features.
+                What students will learn from this course.
               </p>
 
-              {/* Learn items */}
               <div className="mt-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">What you'll learn</span>
+                  <span className="font-medium">Learning Points</span>
                   <button
                     type="button"
                     onClick={addLearn}
@@ -585,12 +595,12 @@ export default function AddCoursePage() {
                   </button>
                 </div>
                 <div className="mt-3 space-y-2">
-                  {learnItems.map((li, i) => (
+                  {wiil_learn?.map((li, i) => (
                     <div key={i} className="flex gap-2">
                       <input
                         value={li}
                         onChange={(e) => updateLearn(i, e.target.value)}
-                        placeholder={`Point #${i + 1}`}
+                        placeholder={`Learning point #${i + 1}`}
                         className="flex-1 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                       />
                       <button
@@ -605,11 +615,18 @@ export default function AddCoursePage() {
                   ))}
                 </div>
               </div>
+            </div>
 
-              {/* Feature cards */}
-              <div className="mt-6">
+            {/* Features */}
+            <div className="rounded-2xl bg-white border border-slate-200 p-5">
+              <h2 className="text-lg font-semibold">Course Features</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                Key features of this course.
+              </p>
+
+              <div className="mt-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">Feature cards</span>
+                  <span className="font-medium">Feature List</span>
                   <button
                     type="button"
                     onClick={addFeature}
@@ -619,26 +636,13 @@ export default function AddCoursePage() {
                   </button>
                 </div>
                 <div className="mt-3 space-y-2">
-                  {features.map((f, i) => (
-                    <div
-                      key={i}
-                      className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
-                    >
+                  {feature.map((f, i) => (
+                    <div key={i} className="flex gap-2">
                       <input
-                        value={f.title}
-                        onChange={(e) =>
-                          updateFeature(i, "title", e.target.value)
-                        }
-                        placeholder="Title (e.g., Audio Lessons)"
-                        className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                      />
-                      <input
-                        value={f.subtitle}
-                        onChange={(e) =>
-                          updateFeature(i, "subtitle", e.target.value)
-                        }
-                        placeholder="Subtitle"
-                        className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                        value={f}
+                        onChange={(e) => updateFeature(i, e.target.value)}
+                        placeholder={`Feature #${i + 1}`}
+                        className="flex-1 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                       />
                       <button
                         type="button"
@@ -654,136 +658,19 @@ export default function AddCoursePage() {
               </div>
             </div>
 
-            {/* Chapters / units */}
-            <div className="rounded-2xl bg-white border border-slate-200 p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">Course Content</h2>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Add units (we'll also create lessons for your "sections"
-                    array).
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={addChapter}
-                  className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-3 py-2 text-sm hover:opacity-90"
-                >
-                  <Plus size={16} /> Add Unit
-                </button>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {chapters.map((c, i) => (
-                  <div
-                    key={i}
-                    className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 p-3 md:[grid-template-columns:1fr_160px_auto]"
-                  >
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs text-slate-600">
-                        Unit title
-                      </label>
-                      <div className="flex gap-2">
-                        <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer w-full">
-                          <Upload size={16} />
-                          <span className="truncate">
-                            {c.title ? c.title : `Select file or enter a title`}
-                          </span>
-                          <input
-                            type="file"
-                            className="sr-only"
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) updateChapter(i, "title", f.name);
-                            }}
-                          />
-                        </label>
-                      </div>
-                      <input
-                        placeholder={`Unit ${i + 1} title`}
-                        value={c.title}
-                        onChange={(e) =>
-                          updateChapter(i, "title", e.target.value)
-                        }
-                        className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)] md:hidden"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-slate-600">
-                        Approx. duration
-                      </label>
-                      <input
-                        value={c.duration}
-                        onChange={(e) =>
-                          updateChapter(i, "duration", e.target.value)
-                        }
-                        placeholder="e.g., 05:00"
-                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                      />
-                    </div>
-
-                    <div className="flex items-end justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removeChapter(i)}
-                        className="inline-flex w-full md:w-auto items-center justify-center rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50"
-                        aria-label="Remove"
-                      >
-                        <X size={16} />
-                        <span className="ml-2 md:hidden text-sm">Remove</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Instructor */}
-            <div className="rounded-2xl bg-white border border-slate-200 p-5">
-              <h2 className="text-lg font-semibold">Instructor</h2>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <input
-                  value={instructor.name}
-                  onChange={(e) =>
-                    setInstructor((s) => ({ ...s, name: e.target.value }))
-                  }
-                  placeholder="Name"
-                  className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                />
-                <input
-                  value={instructor.role}
-                  onChange={(e) =>
-                    setInstructor((s) => ({ ...s, role: e.target.value }))
-                  }
-                  placeholder="Role / Title"
-                  className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                />
-                <textarea
-                  value={instructor.bio}
-                  onChange={(e) =>
-                    setInstructor((s) => ({ ...s, bio: e.target.value }))
-                  }
-                  rows={4}
-                  placeholder="Short bio"
-                  className="sm:col-span-2 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                />
-              </div>
-            </div>
-
             {/* Actions */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <button
                 type="submit"
-                disabled={!valid || saving || videoUploading}
+                disabled={!valid || saving || addLoading}
                 className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-4 py-2 font-medium hover:opacity-90 disabled:opacity-60"
               >
-                {saving ? (
+                {(saving || addLoading) ? (
                   <Loader2 className="animate-spin" size={18} />
                 ) : (
                   <Save size={18} />
                 )}
-                Save course
+                {saving || addLoading ? "Adding Course..." : "Add Course"}
               </button>
               <button
                 type="button"
@@ -812,7 +699,7 @@ export default function AddCoursePage() {
                   {form.video ? (
                     <video
                       src={form.video}
-                      poster={form.poster}
+                      poster={form.image}
                       className="h-full w-full object-cover"
                       autoPlay
                       muted
@@ -823,32 +710,29 @@ export default function AddCoursePage() {
                   ) : (
                     <img
                       src={
-                        form.poster ||
+                        form.image ||
                         "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1400&auto=format&fit=crop"
                       }
-                      alt="Poster"
+                      alt="Course"
                       className="h-full w-full object-cover"
                     />
                   )}
-                  <div
-                    className={`absolute inset-0 bg-gradient-to-r ${form.color} opacity-25`}
-                  />
                   <div className="absolute top-3 left-3 flex flex-wrap gap-2">
                     <span className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200">
                       {form.level}
                     </span>
                     <span className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200">
-                      {form.duration}
+                      {form.Duration}
                     </span>
                   </div>
                 </div>
 
                 <div className="p-4">
                   <h2 className="text-base sm:text-lg font-semibold tracking-tight line-clamp-1">
-                    {form.title || "Course title"}
+                    {form.course_name || "Course title"}
                   </h2>
                   <p className="mt-1 text-slate-600 text-sm line-clamp-2">
-                    {form.description ||
+                    {form.course_description ||
                       "A short course description will appear here."}
                   </p>
 
@@ -866,24 +750,17 @@ export default function AddCoursePage() {
                         </svg>
                         {form.lessons} lessons
                       </span>
-                      <span className="inline-flex items-center gap-1">
-                        <svg viewBox="0 0 24 24" className="h-4 w-4">
-                          <path
-                            fill="currentColor"
-                            d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z"
-                          />
-                        </svg>
-                        {form.teacher}
-                      </span>
                     </div>
                     <span className="font-semibold text-[var(--text-color)]">
-                      {form.price}
+                      ${form.price}
                     </span>
                   </div>
                 </div>
               </article>
             </div>
           </div>
+
+          <button>حفظ</button>
         </form>
       </div>
     </div>

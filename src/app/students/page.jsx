@@ -33,6 +33,7 @@ export default function StudentsPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [viewMode, setViewMode] = useState("table"); // table or grid
 
+  
   const { data, isLoading, isError } = useGetAllStudents();
   console.log({ data, isLoading, isError });
 

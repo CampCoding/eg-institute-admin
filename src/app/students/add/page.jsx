@@ -185,7 +185,7 @@
 // }
 
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { Card, Form, Input, Button, DatePicker, Select, message } from "antd";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -194,6 +194,9 @@ import dayjs from "dayjs";
 
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { timezoneOptions } from "../../../utils/timeZone";
+import axios from "axios";
+import { BASE_URL } from "@/utils/base_url";
+import toast from "react-hot-toast";
 
 const { Option } = Select;
 
@@ -205,8 +208,8 @@ const schema = yup.object({
     .trim()
     .email("Please enter a valid email")
     .required("Please enter the email address"),
-  country: yup.string().trim().required("Please enter the country"),
-  timezone: yup.string().required("Please select the timezone"),
+  // country: yup.string().trim().required("Please enter the country"),
+  // timezone: yup.string().required("Please select the timezone"),
   password: yup
     .string()
     .min(6, "Password must be at least 6 characters")
@@ -216,16 +219,16 @@ const schema = yup.object({
     .trim()
     .required("Please enter the phone number")
     .matches(/^[0-9+\-\s()]{7,}$/, "Please enter a valid phone number"),
-  group: yup.string().nullable().optional(),
-  level: yup.string().nullable().optional(),
-  status: yup
-    .string()
-    .oneOf(["Active", "Inactive"])
-    .required("Please select student status"),
-  enrollmentDate: yup
-    .mixed()
-    .required("Please select enrollment date")
-    .test("is-dayjs", "Invalid date", (v) => dayjs.isDayjs(v) && v.isValid()),
+  // group: yup.string().nullable().optional(),
+  // level: yup.string().nullable().optional(),
+  // status: yup
+  //   .string()
+  //   .oneOf(["Active", "Inactive"])
+  //   .required("Please select student status"),
+  // enrollmentDate: yup
+  //   .mixed()
+  //   .required("Please select enrollment date")
+  //   .test("is-dayjs", "Invalid date", (v) => dayjs.isDayjs(v) && v.isValid()),
 });
 
 export default function AddStudentPage() {
@@ -251,17 +254,44 @@ export default function AddStudentPage() {
     mode: "onTouched",
   });
 
+  const [addLoading , setAddLoading] = useState(false);
+
   const onSubmit = async (values) => {
+    const token = localStorage.getItem("AccessToken");
+    setAddLoading(true);
     const payload = {
       ...values,
-      enrollmentDate: values.enrollmentDate
-        ? values.enrollmentDate.format("YYYY-MM-DD")
-        : null,
+      student_name : values?.name,
+      student_email : values?.email,
+      phone:values?.phone,
+      password:values?.password,
+      created_at: Date.now(),
+      // enrollmentDate: values.enrollmentDate
+      //   ? values.enrollmentDate.format("YYYY-MM-DD")
+      //   : null,
     };
 
     console.log("Submitted Student:", payload);
+    axios.post(BASE_URL+"/students/add_students.php",payload , {
+      headers : {
+        "Authorization":`Bearer ${token}`
+      }
+    }).then(res =>{
+      console.log(res);
+      if(res?.data?.status == "success") {
+        toast.success(res?.data?.message);
+        axios.get(BASE_URL+'/students/select_students.php')
+        reset();
+      }else{
+        toast.error(res?.data?.message);
+      }
+    }).catch(e => console.log(e))
+    .finally(() => {
+      setAddLoading(false);
+      reset();
+    })
 
-    reset();
+    // reset();
   };
 
   return (
@@ -306,7 +336,7 @@ export default function AddStudentPage() {
           </Form.Item>
 
           {/* Country */}
-          <Form.Item
+          {/* <Form.Item
             label="Country"
             validateStatus={errors.country ? "error" : ""}
             help={errors.country?.message}
@@ -318,10 +348,10 @@ export default function AddStudentPage() {
                 <Input {...field} placeholder="Enter country" />
               )}
             />
-          </Form.Item>
+          </Form.Item> */}
 
           {/* Timezone */}
-          <Form.Item
+          {/* <Form.Item
             label="Timezone"
             validateStatus={errors.timezone ? "error" : ""}
             help={errors.timezone?.message}
@@ -350,7 +380,7 @@ export default function AddStudentPage() {
                 </Select>
               )}
             />
-          </Form.Item>
+          </Form.Item> */}
 
           {/* Password */}
           <Form.Item
@@ -383,7 +413,7 @@ export default function AddStudentPage() {
           </Form.Item>
 
           {/* Group */}
-          <Form.Item
+          {/* <Form.Item
             label="Group"
             validateStatus={errors.group ? "error" : ""}
             help={errors.group?.message}
@@ -399,10 +429,10 @@ export default function AddStudentPage() {
                 </Select>
               )}
             />
-          </Form.Item>
+          </Form.Item> */}
 
           {/* Level */}
-          <Form.Item
+          {/* <Form.Item
             label="Level"
             validateStatus={errors.level ? "error" : ""}
             help={errors.level?.message}
@@ -420,10 +450,10 @@ export default function AddStudentPage() {
                 </Select>
               )}
             />
-          </Form.Item>
+          </Form.Item> */}
 
           {/* Status */}
-          <Form.Item
+          {/* <Form.Item
             label="Status"
             validateStatus={errors.status ? "error" : ""}
             help={errors.status?.message}
@@ -438,10 +468,10 @@ export default function AddStudentPage() {
                 </Select>
               )}
             />
-          </Form.Item>
+          </Form.Item> */}
 
           {/* Enrollment Date */}
-          <Form.Item
+          {/* <Form.Item
             label="Enrollment Date"
             validateStatus={errors.enrollmentDate ? "error" : ""}
             help={errors.enrollmentDate?.message}
@@ -457,14 +487,14 @@ export default function AddStudentPage() {
                 />
               )}
             />
-          </Form.Item>
+          </Form.Item> */}
 
           {/* Submit */}
           <Form.Item className="text-right">
             <Button
               type="primary"
               htmlType="submit"
-              loading={isSubmitting}
+              loading={addLoading}
               className="!bg-[#02AAA0] hover:!bg-[#029a92]"
             >
               Add Student
