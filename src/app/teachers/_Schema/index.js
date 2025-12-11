@@ -1,86 +1,50 @@
 import * as yup from "yup";
+import moment from "moment";
 
-const days = [
-  "Saturday",
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-];
+const timeRegex = /^\d{2}:\d{2}(:\d{2})?$/; // "HH:mm" أو "HH:mm:ss"
 
 export const teacherSchema = yup.object({
-  name: yup.string().trim().required("Teacher name is required"),
+  // ... نفس الحقول اللي فوق
 
-  email: yup
-    .string()
-    .trim()
-    .email("Invalid email")
-    .required("Email is required"),
-
-  phone: yup
-    .string()
-    .trim()
-    .required("Phone is required")
-    .matches(/^\d{8,15}$/, "Phone must be 8–15 digits"),
-
-  hourly_rate: yup
-    .number()
-    .typeError("Hourly rate must be a number")
-    .positive("Hourly rate must be > 0")
-    .required("Hourly rate is required"),
-
-  photo: yup
-    .string()
-    .trim()
-    .url("Invalid image URL")
-    .required("Image is required"),
-
-  title: yup.string().trim().required("Specialization is required"),
-
-  summary: yup
-    .string()
-    .trim()
-    .min(10, "Bio too short")
-    .required("Bio is required"),
-
-  // tags عندك array من Select mode="tags"
-  tags: yup.array().of(yup.string().trim()).min(1, "Add at least 1 tag"),
-
-  // Languages عندك array
-  Languages: yup
-    .array()
-    .of(yup.string().trim())
-    .min(1, "Add at least 1 language")
-    .required(),
-
-  country: yup.string().trim().required("Country is required"),
-  TimeZone: yup.string().trim().required("Time zone is required"),
-
-  // level عندك "Beginner" ... (Capitalized)
-  level: yup
-    .string()
-    .oneOf(["Beginner", "Intermediate", "Expert"], "Invalid level")
-    .required("Level is required"),
-
-  // teacher_slots: هنا slots_from/slots_to Moment/Dayjs (مش string)
   teacher_slots: yup
     .array()
     .of(
       yup.object({
         day: yup
           .string()
-          .oneOf(days, "Invalid day")
+          .oneOf(
+            [
+              "Saturday",
+              "Sunday",
+              "Monday",
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+            ],
+            "Invalid day"
+          )
           .required("Day is required"),
-        slots_from: yup.mixed().required("From is required"),
+
+        slots_from: yup
+          .string()
+          .required("From is required")
+          .matches(timeRegex, "Invalid time"),
+
         slots_to: yup
-          .mixed()
+          .string()
           .required("To is required")
+          .matches(timeRegex, "Invalid time")
           .test("after", "To must be after From", function (to) {
             const from = this.parent.slots_from;
             if (!from || !to) return true;
-            return to.isAfter(from); // moment/dayjs
+
+            const fromM = moment(from, "HH:mm:ss");
+            const toM = moment(to, "HH:mm:ss");
+
+            if (!fromM.isValid() || !toM.isValid()) return false;
+
+            return toM.isAfter(fromM);
           }),
       })
     )

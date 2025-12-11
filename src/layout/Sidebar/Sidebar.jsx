@@ -18,6 +18,7 @@ import {
   FileStack,
   BookOpen,
   LogOut,
+  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -96,6 +97,26 @@ const links = [
 
   { id: 8, label: "Scheduling", icon: CalendarRange, href: "/scheduling" },
 
+  {
+    id: 9,
+    label: "Subscriptions",
+    icon: UserCheck,
+    href: "/subscriptions",
+    children: [
+      {
+        id: 1,
+        name: "Subscriptions",
+        icon: UserCheck,
+        href: "/subscriptions",
+      },
+      {
+        id: 2,
+        name: "Add Subscription",
+        icon: CirclePlus,
+        href: "/finance-transactions/add-finance",
+      },
+    ],
+  },
   {
     id: 9,
     label: "Finance Transactions",

@@ -2,6 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   TeacherSlots: null,
+  teacher: null,
 };
 
 const teacherSlice = createSlice({
@@ -14,8 +15,15 @@ const teacherSlice = createSlice({
     clearTeacherSlots: (state) => {
       state.TeacherSlots = null;
     },
+    setTeacher: (state, action) => {
+      state.teacher = action.payload;
+    },
+    clearTeacher: (state) => {
+      state.teacher = null;
+    },
   },
 });
 
-export const { setSlots, clearTeacherSlots } = teacherSlice.actions;
+export const { setSlots, clearTeacherSlots, setTeacher, clearTeacher } =
+  teacherSlice.actions;
 export default teacherSlice;
