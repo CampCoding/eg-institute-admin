@@ -43,15 +43,12 @@ export default function AddCoursePage() {
 
   // Overview "What you'll learn" - API expects a string, not array
   const [wiil_learn, setWiilLearn] = useState([
-    "Read and write Arabic script fluently",
-    "Engage in everyday Egyptian conversations",
+  
   ]);
   
   // Features - API expects a string, not array of objects
   const [feature, setFeature] = useState([
-    "Interactive Dialogues",
-    "Audio Lessons with native pronunciation",
-    "Writing Practice for script mastery",
+  
   ]);
 
   // Free trials list (not in API, keep for UI only)
@@ -68,7 +65,7 @@ export default function AddCoursePage() {
 
   // Chapters (for UI only, not in API)
   const [chapters, setChapters] = useState([
-    { title: "Introduction", duration: "05:00" },
+    // { title: "Introduction", duration: "05:00" },
   ]);
 
   const [saving, setSaving] = useState(false);
@@ -89,15 +86,16 @@ export default function AddCoursePage() {
     
     try {
       const token = localStorage.getItem("AccessToken");
-      const response = await axios.post(`${BASE_URL}/${endpoint}`, formData, {
+      const response = await axios.post(`https://camp-coding.tech/eg_Institute/${endpoint}`, formData, {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "multipart/form-data"
         }
       });
+      console.log(response);
       
-      if (response?.data?.status === "success") {
-        return response.data.url; // Assuming API returns { status: "success", url: "path/to/file" }
+      if (response?.status === 200) {
+        return response.data; // Assuming API returns { status: "success", url: "path/to/file" }
       }
       throw new Error("Upload failed");
     } catch (error) {
@@ -218,117 +216,225 @@ export default function AddCoursePage() {
   });
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!valid) return;
+  e.preventDefault();
+  if (!valid) return;
 
-    setSaving(true);
-    setAddLoading(true);
+  setSaving(true);
+  setAddLoading(true);
 
-    try {
-      // Upload files first if they exist
-      let imageUrl = form.image;
-      let videoUrl = form.video;
-      let advertisingVideoUrl = form.advertising_video;
+  try {
+    const token = localStorage.getItem("AccessToken");
 
-      // Upload image file
-      if (imageFile && typeof imageFile === 'object') {
-        const uploadedImageUrl = await uploadFile(imageFile, 'upload_image.php', 'image');
-        if (uploadedImageUrl) imageUrl = uploadedImageUrl;
-      }
+    // 1) Decide what image URL to send
+    //    - If user uploaded a file → upload it first, use backend URL
+    //    - Else → use whatever is typed in form.image
+    let imageUrlToSend = form.image?.trim() || "";
 
-      // Upload main video file
-      if (videoFile && typeof videoFile === 'object') {
-        const uploadedVideoUrl = await uploadFile(videoFile, 'upload_video.php', 'video');
-        if (uploadedVideoUrl) videoUrl = uploadedVideoUrl;
-      }
-
-      // Upload advertising video file
-      if (advertisingVideoFile && typeof advertisingVideoFile === 'object') {
-        const uploadedAdVideoUrl = await uploadFile(advertisingVideoFile, 'upload_video.php', 'video');
-        if (uploadedAdVideoUrl) advertisingVideoUrl = uploadedAdVideoUrl;
-      }
-
-      // Prepare payload according to API structure
-      const payload = {
-        type: form.type || "Online",
-        course_name: form.course_name,
-        course_description: form.course_description,
-        overview: form.overview,
-        level: form.level,
-        Duration: form.Duration,
-        lessons: form.lessons.toString(), // API expects string
-        price: form.price,
-        image: imageUrl,
-        video: videoUrl,
-        advertising_video: advertisingVideoUrl,
-        wiil_learn: wiil_learn?.filter(Boolean).join(", "), // Convert array to string
-        feature: feature.filter(Boolean).join(", "), // Convert array to string
-        hidden: form.hidden || "0"
-        // Note: created_at should be handled by the API/server
-      };
-
-      console.log("Sending payload:", payload);
-
-      const token = localStorage.getItem("AccessToken");
-      const response = await axios.post(
-        `${BASE_URL}/courses/add_course.php`,
-        payload,
-        {
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
-        }
+    if (imageFile && typeof imageFile === "object") {
+      const uploadedImageUrl = await uploadFile(
+        imageFile,
+        "image_uplouder.php", // your PHP upload endpoint
+        "image"               // field name expected by PHP
       );
-     console.log(response);
-      if (response?.data?.status === "success") {
-        toast.success(response.data.message || "Course added successfully!");
-        
-        // Refresh courses list if needed
-        try {
-          await axios.get(`${BASE_URL}/courses/select_live_courses.php`, {
-            headers: {
-              "Authorization": `Bearer ${token}`
-            }
-          });
-        } catch (refreshError) {
-          console.log("Refresh courses error:", refreshError);
-        }
-        
-        // Reset form and redirect
-        setForm({
-          course_name: "",
-          course_description: "",
-          overview: "",
-          level: "Beginner",
-          Duration: "12 weeks",
-          lessons: "12",
-          price: "50",
-          image: "",
-          video: "",
-          advertising_video: "",
-          type: "Online",
-          hidden: "0"
-        });
-        setWiilLearn(["Read and write Arabic script fluently", "Engage in everyday Egyptian conversations"]);
-        setFeature(["Interactive Dialogues", "Audio Lessons with native pronunciation", "Writing Practice for script mastery"]);
-        setImageFile(null);
-        setVideoFile(null);
-        setAdvertisingVideoFile(null);
-        
-        // Redirect to courses page
-        router.push("/courses");
-      } else {
-        toast.error(response?.data?.message || "Failed to add course");
+
+      if (!uploadedImageUrl) {
+        toast.error("Image upload failed. Please try again.");
+        return;
       }
-    } catch (err) {
-      console.error("Error adding course:", err);
-      toast.error(err.response?.data?.message || "An error occurred while adding the course");
-    } finally {
-      setSaving(false);
-      setAddLoading(false);
+
+      imageUrlToSend = uploadedImageUrl;
+
+      // Optional: update form so preview uses the real URL from server
+      setForm((prev) => ({
+        ...prev,
+        image: uploadedImageUrl,
+      }));
     }
-  };
+
+    // 2) Prepare payload according to API structure
+    const payload = {
+      type: form.type || "Online",
+      course_name: form.course_name,
+      course_description: form.course_description,
+      overview: form.overview,
+      level: form.level,
+      Duration: form.Duration,
+      lessons: form.lessons.toString(),
+      price: form.price,
+      image: imageUrlToSend,        // 👈 now always a real URL
+      video: "videoUrl",            // TODO: hook this up like image if needed
+      advertising_video: "jjhjhr",  // TODO: same here if you want
+      wiil_learn: wiil_learn.filter(Boolean).join(", "),
+      feature: feature.filter(Boolean).join(", "),
+      hidden: form.hidden || "0",
+      created_at: Date.now(),       // or let backend handle this
+    };
+
+    console.log("Sending payload:", payload);
+
+    const response = await axios.post(
+      `${BASE_URL}/courses/add_course.php`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log(response);
+
+    if (response?.data?.status === "success") {
+      toast.success(response.data.message || "Course added successfully!");
+
+      // Optional: refresh courses
+      try {
+        await axios.get(`${BASE_URL}/courses/select_live_courses.php`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (refreshError) {
+        console.log("Refresh courses error:", refreshError);
+      }
+
+      // Reset form
+      setForm({
+        course_name: "",
+        course_description: "",
+        overview: "",
+        level: "Beginner",
+        Duration: "12 weeks",
+        lessons: "12",
+        price: "50",
+        image: "",
+        video: "",
+        advertising_video: "",
+        type: "Online",
+        hidden: "0",
+      });
+      setWiilLearn([]);
+      setFeature([]);
+      setImageFile(null);
+      setVideoFile(null);
+      setAdvertisingVideoFile(null);
+
+      router.push("/courses");
+    } else {
+      toast.error(response?.data?.message || "Failed to add course");
+    }
+  } catch (err) {
+    console.error("Error adding course:", err);
+    toast.error(
+      err.response?.data?.message ||
+        "An error occurred while adding the course"
+    );
+  } finally {
+    setSaving(false);
+    setAddLoading(false);
+  }
+};
+
+
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   if (!valid) return;
+
+  //   setSaving(true);
+  //   setAddLoading(true);
+
+  //   try {
+  //     // Upload files first if they exist
+  //     let imageUrl = "";
+
+  //       const uploadedImageUrl = await uploadFile(imageFile, 'image_uplouder.php', 'image');
+      
+  //       console.log(uploadedImageUrl);
+      
+
+    
+
+  //     // Prepare payload according to API structure
+  //     const payload = {
+  //       type: form.type || "Online",
+  //       course_name: form.course_name,
+  //       course_description: form.course_description,
+  //       overview: form.overview,
+  //       level: form.level,
+  //       Duration: form.Duration,
+  //       lessons: form.lessons.toString(), // API expects string
+  //       price: form.price,
+  //       image: imageUrl,
+  //       video: "videoUrl",
+  //       advertising_video: "jjhjhr",
+  //       wiil_learn: wiil_learn?.filter(Boolean).join(", "), // Convert array to string
+  //       feature: feature.filter(Boolean).join(", "), // Convert array to string
+  //       hidden: form.hidden || "0",
+  //       created_at : Date.now()
+  //       // Note: created_at should be handled by the API/server
+  //     };
+
+  //     console.log("Sending payload:", payload);
+
+  //   //   const token = localStorage.getItem("AccessToken");
+  //   //   const response = await axios.post(
+  //   //     `${BASE_URL}/courses/add_course.php`,
+  //   //     payload,
+  //   //     {
+  //   //       headers: {
+  //   //         "Authorization": `Bearer ${token}`,
+  //   //         "Content-Type": "application/json"
+  //   //       }
+  //   //     }
+  //   //   );
+  //   //  console.log(response);
+  //   //   if (response?.data?.status === "success") {
+  //   //     toast.success(response.data.message || "Course added successfully!");
+        
+  //   //     // Refresh courses list if needed
+  //   //     try {
+  //   //       await axios.get(`${BASE_URL}/courses/select_live_courses.php`, {
+  //   //         headers: {
+  //   //           "Authorization": `Bearer ${token}`
+  //   //         }
+  //   //       });
+  //   //     } catch (refreshError) {
+  //   //       console.log("Refresh courses error:", refreshError);
+  //   //     }
+        
+  //   //     // Reset form and redirect
+  //   //     setForm({
+  //   //       course_name: "",
+  //   //       course_description: "",
+  //   //       overview: "",
+  //   //       level: "Beginner",
+  //   //       Duration: "12 weeks",
+  //   //       lessons: "12",
+  //   //       price: "50",
+  //   //       image: "",
+  //   //       video: "",
+  //   //       advertising_video: "",
+  //   //       type: "Online",
+  //   //       hidden: "0"
+  //   //     });
+  //   //     setWiilLearn(["Read and write Arabic script fluently", "Engage in everyday Egyptian conversations"]);
+  //   //     setFeature(["Interactive Dialogues", "Audio Lessons with native pronunciation", "Writing Practice for script mastery"]);
+  //   //     setImageFile(null);
+  //   //     setVideoFile(null);
+  //   //     setAdvertisingVideoFile(null);
+        
+  //   //     // Redirect to courses page
+  //   //     router.push("/courses");
+  //   //   } else {
+  //   //     toast.error(response?.data?.message || "Failed to add course");
+  //   //   }
+  //   } catch (err) {
+  //     console.error("Error adding course:", err);
+  //     toast.error(err.response?.data?.message || "An error occurred while adding the course");
+  //   } finally {
+  //     setSaving(false);
+  //     setAddLoading(false);
+  //   }
+  // };
 
   // Input styling
   const inputClass = "mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]";

@@ -1,22 +1,24 @@
 "use client";
 
-
 import React, { useEffect, useMemo, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { courses as seedCourses } from "@/utils/data";
 import { useRouter } from "next/navigation";
-import { Trash, Pencil } from "lucide-react";
-import DeleteModal from "@/components/DeleteModal/DeleteModal";
+import { Trash, Pencil, EyeOff, Eye, Info } from "lucide-react";
 import axios from "axios";
 import { BASE_URL } from "@/utils/base_url";
-import { Spin } from "antd";
+import { Modal, Spin } from "antd";
+import toast from "react-hot-toast";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
 
 export default function CoursesPage() {
   const router = useRouter();
-  const [allCoursesLoading , setAllCoursesLoading] = useState(false);
-  const [allCoursesData , setAllCoursesData] = useState([]);
-
-  // Start from provided dataset (no localStorage merge)
+  const [allCoursesLoading, setAllCoursesLoading] = useState(false);
+  const [allCoursesData, setAllCoursesData] = useState([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  // Start from provided dataset (not actually used after fetch)
   const [data, setData] = useState(seedCourses);
   const [searchTerm, setSearchTerm] = useState("");
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
@@ -24,27 +26,30 @@ export default function CoursesPage() {
 
   function handleGetAllCourses() {
     const token = localStorage.getItem("AccessToken");
-    try{  
-     setAllCoursesLoading(true);
-     axios.get(BASE_URL+"/courses/select_live_courses.php",{
-        headers : {
-          "Authorization" :`Bearer ${token}`
-        }
-     })
-     .then(res => {
-      if(res?.data?.status == "success") {
-        setAllCoursesData(res?.data?.message);
-      }
-     }).catch(e => console.log(e))
-     .finally(() => setAllCoursesLoading(false))
-    }catch(err) {
-      console.log(err)
+    try {
+      setAllCoursesLoading(true);
+      axios
+        .get(BASE_URL + "/courses/select_live_courses.php", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        .then((res) => {
+          if (res?.data?.status === "success") {
+            setAllCoursesData(res?.data?.message || []);
+          }
+        })
+        .catch((e) => console.log(e))
+        .finally(() => setAllCoursesLoading(false));
+    } catch (err) {
+      console.log(err);
+      setAllCoursesLoading(false);
     }
   }
 
   useEffect(() => {
     handleGetAllCourses();
-  } , [])
+  }, []);
 
   const filtered = useMemo(() => {
     const q = (searchTerm || "").trim().toLowerCase();
@@ -58,23 +63,60 @@ export default function CoursesPage() {
   }, [allCoursesData, searchTerm]);
 
   function handleDelete() {
-    if (!selectedCourse) return;
-    setData((prev) => prev.filter((c) => String(c.id) !== String(selectedCourse.id)));
-    setOpenDeleteModal(false);
-    setSelectedCourse(null);
+    const token = localStorage.getItem("AccessToken");
+    setDeleteLoading(true);
+
+    if (!selectedCourse) {
+      setDeleteLoading(false);
+      return;
+    }
+
+    const data_send = {
+      course_id: selectedCourse?.course_id,
+    };
+
+    axios
+      .post(BASE_URL + "/courses/toggle_course.php", data_send, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => {
+        if (res?.data?.status === "success") {
+          toast.success(res?.data?.message || "Status updated");
+          setOpenDeleteModal(false);
+          setSelectedCourse(null);
+          // Refresh list to reflect new status
+          handleGetAllCourses();
+        } else {
+          toast.error(res?.data?.message || "Failed to update status");
+        }
+      })
+      .catch((e) => {
+        console.log(e);
+        toast.error("Something went wrong");
+      })
+      .finally(() => setDeleteLoading(false));
   }
 
   useEffect(() => {
-    console.log(filtered)
-  } , [filtered])
+    console.log(filtered);
+  }, [filtered]);
 
-  if(allCoursesLoading){
+  if (allCoursesLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <Spin size="large" spinning/>
+        <Spin size="large" spinning />
       </div>
-    )
+    );
   }
+
+  // Helper: check if course is hidden ("1" or 1)
+  const isSelectedHidden =
+    selectedCourse &&
+    (selectedCourse.hidden === "1" ||
+      selectedCourse.hidden === 1 ||
+      selectedCourse.hidden === true);
 
   return (
     <div className="min-h-screen">
@@ -102,7 +144,7 @@ export default function CoursesPage() {
       <div className="grid mt-5 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {filtered?.map((c) => (
           <article
-            key={c.id}
+            key={c.course_id ?? c.id}
             className="group relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
           >
             {/* Soft blob accent */}
@@ -133,7 +175,6 @@ export default function CoursesPage() {
                   loading="lazy"
                 />
               )}
-              {/* <div className={`absolute inset-0 bg-gradient-to-r ${c?.color} opacity-25`} /> */}
 
               {/* Badges */}
               <div className="absolute top-3 left-3 flex gap-2">
@@ -151,6 +192,11 @@ export default function CoursesPage() {
                     {c?.lessons?.length} units
                   </span>
                 )}
+                {(c?.hidden === "1" || c?.hidden === 1) && (
+                  <span className="text-[11px] rounded-full bg-red-100 text-red-700 px-2 py-1 ring-1 ring-red-200">
+                    Hidden
+                  </span>
+                )}
               </div>
             </div>
 
@@ -159,50 +205,52 @@ export default function CoursesPage() {
               <h2 className="text-base sm:text-lg font-semibold tracking-tight line-clamp-1">
                 {c?.course_name}
               </h2>
-              <p className="mt-1 text-slate-600 text-sm line-clamp-2">{c?.course_descreption}</p>
+              <p className="mt-1 text-slate-600 text-sm line-clamp-2">
+                {c?.course_descreption}
+              </p>
 
               <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
                 <div className="flex items-center gap-3">
-                  <span title="Lessons" className="inline-flex items-center gap-1">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4">
-                      <path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" />
-                    </svg>
-                    {c?.lessons} lessons
-                  </span>
-                  {/* <span className="inline-flex items-center gap-1">
+                  <span
+                    title="Lessons"
+                    className="inline-flex items-center gap-1"
+                  >
                     <svg viewBox="0 0 24 24" className="h-4 w-4">
                       <path
                         fill="currentColor"
-                        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z"
+                        d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"
                       />
                     </svg>
-                    {c.teacher}
-                  </span> */}
+                    {c?.lessons} lessons
+                  </span>
                 </div>
-                <span className="font-semibold text-[var(--text-color)]">{c?.price}</span>
+                <span className="font-semibold text-[var(--text-color)]">
+                  {c?.price}
+                </span>
               </div>
 
               {/* Actions */}
               <div className="mt-3 flex items-center gap-2">
                 <button
-                  onClick={() => router.push(`/courses/details/${c.id}`)}
-                  className="flex-1 rounded-xl bg-[var(--primary-color)] text-white py-2 text-sm font-medium hover:opacity-90"
+                  onClick={() =>
+                    router.push(`/courses/units/${c.course_id ?? c.id}`)
+                  }
+                  className="flex-1 rounded-xl bg-[var(--primary-color)] !text-white py-2 text-sm font-medium hover:opacity-90"
                 >
-                  Details
+                  Units
                 </button>
 
-                {/* {Array.isArray(c.units) && c.units.length > 0 && (
-                  <button
-                    onClick={() => router.push(`/courses/units/${c.id}`)}
-                    className="flex-1 rounded-xl border border-slate-200 py-2 text-sm font-medium hover:bg-slate-50"
-                  >
-                    Units
-                  </button>
-                )} */}
-
                 {/* Edit icon */}
+                <button 
+                title="Details"
+                className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
+                onClick={() => router.push(`/courses/details/${c.course_id ?? c.id}`)}>
+                  <Info  size={18}/>
+                </button>
                 <button
-                  onClick={() => router.push(`/courses/edit/${c.id}`)}
+                  onClick={() =>
+                    router.push(`/courses/edit/${c?.course_id ?? c.id}`)
+                  }
                   className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
                   aria-label="Edit course"
                   title="Edit"
@@ -210,17 +258,19 @@ export default function CoursesPage() {
                   <Pencil size={18} />
                 </button>
 
-                {/* Delete icon */}
+                {/* Delete / Toggle status icon */}
                 <button
                   onClick={() => {
                     setSelectedCourse(c);
                     setOpenDeleteModal(true);
                   }}
                   className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
-                  aria-label="Delete course"
-                  title="Delete"
+                  aria-label="Toggle course status"
+                  title={
+                    c?.hidden === "1" || c?.hidden === 1 ? "Show course" : "Hide course"
+                  }
                 >
-                  <Trash size={18} />
+                  {c?.hidden? <Eye size={18}/>:<EyeOff size={18} /> }
                 </button>
               </div>
             </div>
@@ -231,17 +281,81 @@ export default function CoursesPage() {
         ))}
       </div>
 
-      <DeleteModal
-        handleSubmit={handleDelete}
-        title="Delete this course"
-        description={
-          selectedCourse
-            ? `Do you want to delete "${selectedCourse.title}"?`
-            : "Delete this course?"
-        }
+      {/* Status Modal (Hide / Show) */}
+      <Modal
         open={openDeleteModal}
-        setOpen={setOpenDeleteModal}
-      />
+        onCancel={() => {
+          if (!deleteLoading) {
+            setOpenDeleteModal(false);
+            setSelectedCourse(null);
+          }
+        }}
+        footer={null}
+        centered
+        closable={!deleteLoading}
+      >
+        <Box
+          sx={{
+            width: "100%",
+          }}
+          className="rounded-md shadow-lg max-w-md mx-auto bg-white"
+        >
+          <Typography
+            id="modal-modal-title"
+            variant="h6"
+            component="h2"
+            className="text-lg font-semibold text-center text-gray-800"
+          >
+            {isSelectedHidden ? "Show this course" : "Hide this course"}
+          </Typography>
+          <Typography
+            id="modal-modal-description"
+            sx={{ mt: 2 }}
+            className="text-sm text-center font-bold text-gray-600"
+          >
+            Do you want to {isSelectedHidden ? "show" : "hide"} this course?
+          </Typography>
+          <div className="flex justify-center gap-4 mt-4">
+            <Button
+              onClick={handleDelete}
+              variant="contained"
+              disabled={deleteLoading}
+              sx={{
+                bgcolor: "#dc2626",
+                color: "white",
+                "&:hover": { bgcolor: "#b91c1c" },
+              }}
+            >
+              {deleteLoading
+                ? "Loading..."
+                : isSelectedHidden
+                ? "Show"
+                : "Hide"}
+            </Button>
+
+            <Button
+              onClick={() => {
+                if (!deleteLoading) {
+                  setOpenDeleteModal(false);
+                  setSelectedCourse(null);
+                }
+              }}
+              variant="outlined"
+              sx={{
+                borderColor: "#ef4444",
+                color: "#dc2626",
+                "&:hover": {
+                  bgcolor: "#ef4444",
+                  color: "white",
+                  borderColor: "#ef4444",
+                },
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </Box>
+      </Modal>
     </div>
   );
 }

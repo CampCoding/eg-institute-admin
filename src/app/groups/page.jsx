@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import {
   Users,
@@ -11,7 +11,6 @@ import {
   Filter,
   LayoutGrid,
   List as ListIcon,
-  MoreVertical,
   BookOpen,
   TrendingUp,
   ChevronDown,
@@ -19,85 +18,52 @@ import {
 import { useRouter } from "next/navigation";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
 import useGetAllGroups from "../../utils/Api/Courses/GetAllGroups";
+import axios from "axios";
+import { Spin } from "antd";
+import toast from "react-hot-toast";
+import { BASE_URL } from "../../utils/base_url";
 
-export const initialGroups = [
-  {
-    id: 1,
-    name: "Beginner English",
-    members: 12,
-    instructor: "John Doe",
-    category: "Language",
-    progress: 75,
-    status: "active",
-    lastActivity: "2 hours ago",
-  },
-  {
-    id: 2,
-    name: "Advanced Math",
-    members: 8,
-    instructor: "Jane Smith",
-    category: "Mathematics",
-    progress: 60,
-    status: "active",
-    lastActivity: "1 day ago",
-  },
-  {
-    id: 3,
-    name: "Science Club",
-    members: 15,
-    instructor: "Ahmed Ali",
-    category: "Science",
-    progress: 90,
-    status: "completed",
-    lastActivity: "3 days ago",
-  },
-  {
-    id: 4,
-    name: "Web Development",
-    members: 20,
-    instructor: "Sarah Johnson",
-    category: "Technology",
-    progress: 45,
-    status: "inactive",
-    lastActivity: "5 hours ago",
-  },
-];
 
 export default function Page() {
-  const [groups, setGroups] = useState(initialGroups);
+  const [groups, setGroups] = useState([]);
   const { data, isLoading } = useGetAllGroups();
-console.log(data);
-
-  const allGroups = data?.message?.map((g) => {
-    return {
-      id: g?.group_id,
-      name: g?.group_name,
-      members: g.members_count,
-      instructor: g?.teacher_name,
-      category: "Language",
-      progress: 75,
-      status: g?.status,
-      maxStudents: g?.max_students,
-    };
-  });
-  console.log(allGroups);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all"); // all | active | completed | inactive
   const [sortBy, setSortBy] = useState("recent"); // recent | members | progress | name
-  const [viewMode, setViewMode] = useState("grid"); // grid | list
+  const [viewMode, setViewMode] = useState("grid");
   const [quickCat, setQuickCat] = useState("all");
+
   const router = useRouter();
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [rowData, setRowData] = useState({});
 
+  // Map API data → groups state
+  useEffect(() => {
+    if (!data?.message) return;
+
+    const mapped = data.message.map((g) => ({
+      id: g?.group_id,
+      name: g?.group_name,
+      members: Number(g?.members_count ?? 0),
+      instructor: g?.teacher_name || "Unknown",
+      category: g?.category || "Language",
+      progress: Number(g?.progress ?? 75), // default if not provided
+      status: g?.status || "inactive",
+      maxStudents: Number(g?.max_students ?? 0),
+    }));
+
+    setGroups(mapped);
+  }, [data]);
+
   const categories = useMemo(
-    () => ["all", ...Array.from(new Set(allGroups?.map((g) => g.category)))],
-    [allGroups]
+    () => ["all", ...Array.from(new Set(groups.map((g) => g.category)))],
+    [groups]
   );
 
   const getStatusStyle = (status) => {
-    const map = {
+    const map= {
       active: "bg-green-50 text-green-700 ring-green-200",
       completed: "bg-blue-50 text-blue-700 ring-blue-200",
       inactive: "bg-slate-50 text-slate-700 ring-slate-200",
@@ -115,7 +81,7 @@ console.log(data);
   };
 
   const filteredGroups = useMemo(() => {
-    let list = allGroups;
+    let list = [...groups]; // copy so sort doesn't mutate state
 
     // search
     if (searchTerm.trim()) {
@@ -139,20 +105,60 @@ console.log(data);
     }
 
     // sort
-    if (sortBy === "members") list.sort((a, b) => b.members - a.members);
-    else if (sortBy === "progress")
+    if (sortBy === "members") {
+      list.sort((a, b) => b.members - a.members);
+    } else if (sortBy === "progress") {
       list.sort((a, b) => b.progress - a.progress);
-    else if (sortBy === "name")
+    } else if (sortBy === "name") {
       list.sort((a, b) => a.name.localeCompare(b.name));
-    // "recent" is default order in this demo (pretend already recent)
+    }
+    // "recent" keeps the original order
 
     return list;
-  }, [allGroups, searchTerm, filterStatus, sortBy, quickCat]);
-  console.log(filteredGroups);
+  }, [groups, searchTerm, filterStatus, sortBy, quickCat]);
 
-  function handleSubmit() {
-    console.log("Group Deleted");
+  // 🔴 HANDLE DELETE HERE
+  const handleSubmit = async () => {
+    if (!rowData?.id) return;
+
+    try {
+      setDeleteLoading(true);
+
+      const data_send = {
+        group_id: rowData.id,
+      };
+
+      const res = await axios.post(
+        `${BASE_URL}/groups/delete_group.php`,
+        data_send
+      );
+
+      // Adjust this condition to match your PHP response structure
+      if (res?.data?.status === "success" || res?.data?.success) {
+        // Remove group from UI
+        toast.success(res?.data?.message);
+        setGroups((prev) => prev.filter((g) => g.id !== rowData.id));
+        setOpenDeleteModal(false);
+      } else {
+        toast.error(res?.data?.message)
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("An error occurred while deleting the group.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  if(isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Spin spinning size="large"/>
+      </div>
+    )
   }
+
+ 
 
   return (
     <div className="min-h-screen">
@@ -161,16 +167,13 @@ console.log(data);
 
         {/* Header */}
         <div className="mt-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            {/* <h1 className="text-2xl sm:text-3xl font-bold text-(--primary-color)">
-              Learning Groups
-            </h1>
-            <p className="text-slate-600">Manage and organize your educational groups.</p> */}
-          </div>
+          <div>{/* Title section if you need it later */}</div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+              onClick={() =>
+                setViewMode(viewMode === "grid" ? "list" : "grid")
+              }
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
               title={viewMode === "grid" ? "List view" : "Grid view"}
             >
@@ -205,7 +208,7 @@ console.log(data);
                 <div className="text-slate-500 text-xs font-semibold">
                   Total Groups
                 </div>
-                <div className="mt-1 text-3xl font-bold">{groups?.length}</div>
+                <div className="mt-1 text-3xl font-bold">{groups.length}</div>
               </div>
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-50">
                 <Users className="text-blue-600" />
@@ -219,7 +222,7 @@ console.log(data);
                   Total Members
                 </div>
                 <div className="mt-1 text-3xl font-bold">
-                  {groups.reduce((s, g) => s + g.members, 0)}
+                  {groups.reduce((s, g) => s + (g.members || 0), 0)}
                 </div>
               </div>
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-emerald-50">
@@ -234,7 +237,7 @@ console.log(data);
                   Active Groups
                 </div>
                 <div className="mt-1 text-3xl font-bold">
-                  {groups?.filter((g) => g.status === "active")?.length}
+                  {groups.filter((g) => g.status === "active").length}
                 </div>
               </div>
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-violet-50">
@@ -321,11 +324,11 @@ console.log(data);
         <div
           className={
             viewMode === "grid"
-              ? "mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+              ? "mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               : "mt-6 space-y-4"
           }
         >
-          {filteredGroups?.map((g) => (
+          {filteredGroups.map((g) => (
             <div
               key={g.id}
               className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-xl ${
@@ -358,14 +361,6 @@ console.log(data);
                         </span>
                       </div>
                     </div>
-
-                    {/* <button
-                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-                      title="More"
-                      onClick={() => alert("Open actions menu")}
-                    >
-                      <MoreVertical size={18} />
-                    </button> */}
                   </div>
 
                   <div className="mt-3 space-y-1.5">
@@ -383,7 +378,6 @@ console.log(data);
                       <span className="font-medium">Instructor:</span>{" "}
                       {g.instructor}
                     </div>
-                    <div className="text-xs text-slate-500"></div>
                   </div>
 
                   {/* Progress */}
@@ -412,7 +406,7 @@ console.log(data);
                   }`}
                 >
                   <button
-                    onClick={() => router.push(`/groups/edit-group/${g?.id}`)}
+                    onClick={() => router.push(`/groups/edit-group/${g.id}`)}
                     className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
                   >
                     <Edit size={16} /> Edit
@@ -433,7 +427,7 @@ console.log(data);
         </div>
 
         {/* Empty state */}
-        {filteredGroups?.length === 0 && (
+        {filteredGroups.length === 0 && !isLoading && (
           <div className="mt-12 text-center">
             <div className="mx-auto mb-4 grid h-24 w-24 place-items-center rounded-full bg-slate-100">
               <Users size={40} className="text-slate-400" />
@@ -448,7 +442,7 @@ console.log(data);
             </p>
             {!(searchTerm || filterStatus !== "all" || quickCat !== "all") && (
               <button
-                onClick={() => alert("Open: Add Group modal")}
+                onClick={() => router.push("/groups/add-group")}
                 className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold !text-white hover:opacity-90"
               >
                 <Plus size={16} /> Create Group
@@ -461,9 +455,11 @@ console.log(data);
       <DeleteModal
         open={openDeleteModal}
         setOpen={setOpenDeleteModal}
-        title={"Delete this gorup"}
-        description={`Do You Want to delete this group ${rowData?.name}?`}
+        title={"Delete this group"}
+        description={`Do you want to delete this group "${rowData?.name}"?`}
         handleSubmit={handleSubmit}
+        // If DeleteModal supports loading prop, pass deleteLoading here:
+        // loading={deleteLoading}
       />
     </div>
   );
