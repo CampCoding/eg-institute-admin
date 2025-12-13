@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Provider } from "react-redux";
-import React from "react";
+import React, { useEffect } from "react";
 import { store } from "./Store/Index";
 
 export default function ProviderWrapper({ children }) {

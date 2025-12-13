@@ -9,7 +9,7 @@ import DeleteModal from "../../components/DeleteModal/DeleteModal";
 import useDeleteTeacher from "../../utils/Api/Teachers/DeleteTeacher";
 import toast from "react-hot-toast";
 import { useDispatch, useSelector } from "react-redux";
-import { setSlots } from "../../utils/Store/TeacherSlice";
+import { setSlots, setTeacher } from "../../utils/Store/TeacherSlice";
 
 /**
  * If you already have teachers data in "@/utils/data",
@@ -19,6 +19,7 @@ import { setSlots } from "../../utils/Store/TeacherSlice";
 
 export default function TeachersPage() {
   const router = useRouter();
+
   const [search, setSearch] = useState("");
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
@@ -254,7 +255,7 @@ export default function TeachersPage() {
 
                 <button
                   onClick={() => {
-                    localStorage.setItem("teacher", JSON.stringify(t));
+                    dispatch(setTeacher(t));
                     router.push(`/teachers/edit/${t.id}`);
                   }}
                   className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"

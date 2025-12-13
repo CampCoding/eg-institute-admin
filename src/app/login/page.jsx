@@ -27,9 +27,11 @@ const page = () => {
         if (res.data.status === "success") {
           toast.success("Login successful!");
           localStorage.setItem("AccessToken", res.data.message.access_token);
+          localStorage.setItem("RefreshToken", res.data.message.refresh_token);
+          localStorage.setItem("UserId", res.data.message.admin_id);
 
           setTimeout(() => {
-            router.push("/");
+            window.location.href = "/";
           }, 1000);
         } else {
           toast.error(res.data.message);

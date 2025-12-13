@@ -5,81 +5,109 @@ import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import React from "react";
 import useGetTeacherById from "../../../../utils/Api/Teachers/GetTeacherById";
+import { useDispatch } from "react-redux";
+import { setTeacher } from "../../../../utils/Store/TeacherSlice";
 
 export default function InstructorProfile({ instructor }) {
   const router = useRouter();
   const { id } = useParams();
-
+  const dispatch = useDispatch();
   const { data: teacher } = useGetTeacherById({ id });
-  console.log(teacher);
 
-    const data = instructor || {
-      id: teacher?.message?.teacher_id,
-      name: teacher?.message?.teacher_name,
-      avatar:
-        teacher?.message?.teacher_image ||
-        "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=1400&auto=format&fit=crop",
-      email: teacher?.message?.teacher_email,
-      phone: teacher?.message?.phone,
-      status: "Active",
-      role: "Arabic Instructor",
-      experienceYears: 7,
-      specialties: ["MSA (الفصحى)", "Conversation", "Grammar", "Tajwīd basics"],
-      langs: teacher?.message?.languages || [
-        "Arabic (Native)",
-        "English (C1)",
-        "French (B1)",
-      ],
-      hourlyRate: teacher?.message?.hourly_rate,
-      bio: teacher?.message?.bio,
-      rating: teacher?.message?.rate,
-      satisfaction: 96,
-      studentsCount: teacher?.message?.student_count,
-      classesCount: 18,
-      lessonsTaught: 1420,
-      attendance: 98,
-      availability: [
-        { day: "Mon", slots: ["10:00–12:00", "15:00–17:00"] },
-        { day: "Tue", slots: ["11:00–14:00"] },
-        { day: "Wed", slots: ["09:00–12:00"] },
-        { day: "Thu", slots: ["13:00–16:00"] },
-        { day: "Fri", slots: ["Off"] },
-      ],
-      courses: [
-        {
-          id: "A101",
-          title: "Arabic for Beginners (A1)",
-          level: "A1",
-          enrolled: 42,
-          progress: 78,
-          nextLesson: "Unit 5 – Pronouns",
-        },
-        {
-          id: "A202",
-          title: "Modern Standard Arabic – Intermediate",
-          level: "B1",
-          enrolled: 31,
-          progress: 52,
-          nextLesson: "Reading: News Headlines",
-        },
-        {
-          id: "C110",
-          title: "Colloquial Egyptian – Survival",
-          level: "A2",
-          enrolled: 28,
-          progress: 64,
-          nextLesson: "Shopping Dialogues",
-        },
-      ],
-      reviews: [
-        { name: "Michael", rating: 5, text: "Clear explanations and patient." },
-        { name: "Aisha", rating: 5, text: "Great pronunciation drills!" },
-        { name: "Leo", rating: 4, text: "Engaging and structured lessons." },
-      ],
-      notes:
-        "Excellent learner feedback; consider adding weekly writing prompts to B1 class.",
-    };
-  console.log(teacher);
+  const data = instructor || {
+    id: teacher?.message?.teacher_id,
+    name: teacher?.message?.teacher_name,
+    avatar:
+      teacher?.message?.teacher_image ||
+      "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=1400&auto=format&fit=crop",
+    email: teacher?.message?.teacher_email,
+    phone: teacher?.message?.phone,
+    status: "Active",
+    role: "Arabic Instructor",
+    level: teacher?.message?.level,
+
+    specialties: [teacher?.specialization],
+    langs: teacher?.message?.languages || [
+      "Arabic (Native)",
+      "English (C1)",
+      "French (B1)",
+    ],
+    hourlyRate: teacher?.message?.hourly_rate,
+    bio: teacher?.message?.bio,
+    rating: teacher?.message?.rate,
+    satisfaction: 96,
+    studentsCount: teacher?.message?.student_count,
+    classesCount: teacher?.message?.class_count,
+    lessonsTaught: 1420,
+    attendance: 98,
+    availability: teacher?.message?.teacher_slots || [],
+    courses: [
+      {
+        id: "A101",
+        title: "Arabic for Beginners (A1)",
+        level: "A1",
+        enrolled: 42,
+        progress: 78,
+        nextLesson: "Unit 5 – Pronouns",
+      },
+      {
+        id: "A202",
+        title: "Modern Standard Arabic – Intermediate",
+        level: "B1",
+        enrolled: 31,
+        progress: 52,
+        nextLesson: "Reading: News Headlines",
+      },
+      {
+        id: "C110",
+        title: "Colloquial Egyptian – Survival",
+        level: "A2",
+        enrolled: 28,
+        progress: 64,
+        nextLesson: "Shopping Dialogues",
+      },
+    ],
+    reviews: [
+      { name: "Michael", rating: 5, text: "Clear explanations and patient." },
+      { name: "Aisha", rating: 5, text: "Great pronunciation drills!" },
+      { name: "Leo", rating: 4, text: "Engaging and structured lessons." },
+    ],
+  };
+
+  const teacherFromApiToForm = {
+    name: data?.name ?? "",
+    teacher_email: data?.email ?? "",
+    phone: data?.phone ?? "",
+    specialization: teacher?.message?.specialization ?? "",
+    summary: data?.bio ?? "",
+    photo: data?.avatar ?? "",
+
+    country: data?.country ?? "",
+    TimeZone: data?.time_zone || "Africa/Cairo",
+
+    hourly_rate: data?.hourlyRate ?? "",
+    level: data?.level
+      ? data.level.charAt(0).toUpperCase() + data.level.slice(1) // "beginner" → "Beginner"
+      : "Expert",
+
+    // tags: string من الـ API → array للفورم
+    tags:
+      typeof teacher?.message?.tags === "string"
+        ? teacher?.message.tags
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : Array.isArray(teacher?.message?.tags)
+        ? teacher?.message?.tags
+        : [],
+
+    // Languages: نفس اللي جاي من الـ API
+    Languages: Array.isArray(data?.languages) ? data.languages : [],
+
+    // مفيش teacher_slots في الريسبونس → نخليها فاضية
+    teacher_slots: [],
+  };
+  console.log(teacherFromApiToForm);
 
   const Pill = ({ children, tone = "default" }) => {
     const tones = {
@@ -144,15 +172,9 @@ export default function InstructorProfile({ instructor }) {
                 <Pill tone="success">{data.status}</Pill>
                 <Pill>ID: {data.id}</Pill>
               </div>
-              <p className="text-gray-500 mt-1">
-                {data.role} • {data.experienceYears} yrs exp
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {data.specialties.map((t) => (
-                  <Pill key={t} tone="info">
-                    {t}
-                  </Pill>
-                ))}
+              <p className="text-gray-500 mt-1">{data.role} •</p>
+              <div className="flex flex-wrap justify-start items-center gap-2 mt-3">
+                level:<Pill tone="info">{data.level}</Pill>
               </div>
             </div>
 
@@ -165,7 +187,10 @@ export default function InstructorProfile({ instructor }) {
                 Schedule
               </button>
               <button
-                onClick={() => router.push(`/teachers/edit/${data?.id}`)}
+                onClick={() => {
+                  dispatch(setTeacher(teacherFromApiToForm));
+                  router.push(`/teachers/edit/${data?.id}`);
+                }}
                 className="px-4 py-2 rounded-xl text-white"
                 style={{ backgroundColor: "#02AAA0" }}
               >
@@ -249,12 +274,6 @@ export default function InstructorProfile({ instructor }) {
                 About
               </h2>
               <p className="text-gray-700 leading-relaxed">{data.bio}</p>
-              <div className="mt-5">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">
-                  Internal Notes
-                </h3>
-                <p className="text-gray-600">{data.notes}</p>
-              </div>
             </div>
 
             {/* Reviews */}
@@ -323,21 +342,22 @@ export default function InstructorProfile({ instructor }) {
                 Weekly Availability
               </h2>
               <div className="space-y-3">
-                {data.availability.map((a) => (
-                  <div key={a.day} className="flex items-start justify-between">
-                    <span className="text-gray-600 w-16">{a.day}</span>
-                    <div className="flex-1 flex flex-wrap gap-2">
-                      {a.slots.map((s, i) => (
-                        <span
-                          key={i}
-                          className="px-2.5 py-1 rounded-lg text-xs border bg-gray-50 text-gray-700"
-                        >
-                          {s}
-                        </span>
-                      ))}
+                {data?.availability?.map((a) => {
+                  console.log(a);
+                  const slot = `${a.slots_from} - ${a.slots_to}`;
+
+                  return (
+                    <div
+                      key={a.day}
+                      className="flex items-start justify-between"
+                    >
+                      <span className="text-gray-600 w-16">{a.day}</span>
+                      <div className="flex-1 flex flex-wrap gap-2">
+                        <Pill>{slot}</Pill>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

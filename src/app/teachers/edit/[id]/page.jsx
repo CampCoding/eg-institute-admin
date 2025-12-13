@@ -21,6 +21,7 @@ import usePostTeacher from "@/utils/Api/Teachers/PostTeachers";
 import toast from "react-hot-toast";
 import { CountrySelect, TimeZoneSelect } from "@/utils/TimeZone/TimeZone";
 import moment from "moment";
+import { useSelector } from "react-redux";
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -104,6 +105,7 @@ function toPreview(values) {
 
 export default function AddTeacherPage() {
   const { mutateAsync, isPending } = usePostTeacher();
+  const { teacher } = useSelector((state) => state.Teacher);
 
   const router = useRouter();
 
@@ -142,42 +144,40 @@ export default function AddTeacherPage() {
   const toTimeString = (m) => (m ? m.format("HH:mm:ss") : "");
 
   useEffect(() => {
-    const raw = localStorage.getItem("teacher");
-    if (!raw) return;
-
-    const t = JSON.parse(raw);
-    console.log(t);
+    if (!teacher) return;
+    console.log(teacher);
 
     reset({
-      name: t.teacher_name ?? "",
-      email: t.teacher_email ?? "",
-      phone: t.phone ?? "",
-      title: t.specialization ?? "",
-      summary: t.bio ?? "",
-      photo: t.teacher_image ?? DEFAULT_PHOTO,
+      name: teacher?.name ?? "",
+      email: teacher?.teacher_email || teacher?.email || "",
+      phone: teacher?.phone ?? "",
+      title: teacher?.specialization ?? "",
+      summary: teacher?.summary ?? "",
+      photo: teacher?.teacher_image ?? DEFAULT_PHOTO,
 
-      country: t.country ?? "",
-      TimeZone: t.time_zone ?? "Africa/Cairo",
+      country: teacher?.country ?? "",
+      TimeZone: teacher?.time_zone ?? "Africa/Cairo",
 
-      hourly_rate: t.hourly_rate ?? "",
+      hourly_rate: teacher?.hourly_rate ?? "",
+      level: teacher?.level ?? "Expert",
 
       // tags: الفورم عندك Select tags mode => array
       tags:
-        typeof t.tags === "string"
-          ? t.tags
+        typeof teacher?.tags === "string"
+          ? teacher?.tags
               .split(",")
               .map((s) => s.trim())
               .filter(Boolean)
-          : Array.isArray(t.tags)
-          ? t.tags
+          : Array.isArray(teacher?.tags)
+          ? teacher?.tags
           : [],
 
       // Languages: عندك اسمها Languages
-      Languages: Array.isArray(t.languages) ? t.languages : [],
+      Languages: Array.isArray(teacher?.languages) ? teacher?.languages : [],
 
       // slots: نخزنهم strings HH:mm:ss (مش dayjs)
-      teacher_slots: Array.isArray(t.teacher_slots)
-        ? t.teacher_slots.map((s) => ({
+      teacher_slots: Array.isArray(teacher?.teacher_slots)
+        ? teacher?.teacher_slots.map((s) => ({
             day: s.day ?? "Monday",
             slots_from: s.slots_from ?? "", // "12:00:00"
             slots_to: s.slots_to ?? "",
@@ -208,14 +208,14 @@ export default function AddTeacherPage() {
       created_at: new Date().toISOString().split("T")[0],
       teacher_slots: (values.teacher_slots || []).map((s) => ({
         day: s.day,
-        slots_from: s.slots_from?.format("HH:mm:ss"),
-        slots_to: s.slots_to?.format("HH:mm:ss"),
+        slots_from: s.slots_from,
+        slots_to: s.slots_to,
       })),
     };
     console.log(payload);
 
     try {
-      const res = await mutateAsync({ payload, type: "add" });
+      const res = await mutateAsync({ payload, type: "edit", id: teacher.id });
       console.log(res);
 
       if (res.status === "success") {
@@ -243,7 +243,7 @@ export default function AddTeacherPage() {
         </button>
       </div>
 
-      <BreadCrumb title="Add Teacher" parent="Teachers" child="Add" />
+      <BreadCrumb title="Edit Teacher" parent="Teachers" child="Edit" />
 
       <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: FORM */}
@@ -505,7 +505,7 @@ export default function AddTeacherPage() {
                 loading={isPending}
                 className="!bg-[#02AAA0] hover:!bg-[#029a92]"
               >
-                Add Teacher
+                Update Teacher
               </Button>
             </Form.Item>
           </form>

@@ -11,14 +11,13 @@ import {
   message,
 } from "antd";
 import moment from "moment";
-import { PlusIcon } from "lucide-react";
+import { ArrowLeft, PlusIcon } from "lucide-react";
 
 import "./schedule.css";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import useGetTeacherSchedule from "../../../../utils/Api/Teachers/GetTeacherSchedule";
-import { useParams } from "next/navigation";
-
+import { useParams, useRouter } from "next/navigation";
 const { Option } = Select;
 
 // Simple Loader Component
@@ -48,6 +47,7 @@ const Schedule = () => {
   const [showAddLessonModal, setShowAddLessonModal] = useState(false);
   const [addLessonForm] = Form.useForm();
   const { data: teacherSchedule, isLoading } = useGetTeacherSchedule(id);
+  const router = useRouter();
   console.log(teacherSchedule, isLoading);
 
   const daysOfWeek = [
@@ -477,6 +477,16 @@ const Schedule = () => {
   return (
     <div className="schedule-wrapper">
       <div className="schedule-header-section">
+        <div className="mb-5">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+          >
+            <ArrowLeft size={16} className="inline -mt-0.5 mr-1" />
+            Back
+          </button>
+        </div>
         <div className="flex justify-between items-center">
           <h1 className="schedule-main-title">Schedule Lessons</h1>
           <Button
@@ -490,11 +500,41 @@ const Schedule = () => {
           </Button>
         </div>
       </div>
+      {teacherSchedule && teacherSchedule.length === 0 && (
+        <>
+          <div className="schedule-container">
+            <div className="schedule-grid">
+              <div className="schedule-header">
+                <div className="schedule-cell day-header">Day / Time</div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="page_content">
-        {loading ? (
+        {isLoading ? (
           <Loader />
+        ) : !teacherSchedule || lessons.length === 0 ? (
+          // 🔴 شاشة "مفيش داتا"
+          <div className="no-data-wrapper flex justify-center items-center h-[calc(100vh-130px)] px-4">
+            <div className="no-data-card max-w-md w-full rounded-2xl border border-slate-200 bg-white/70 shadow-sm backdrop-blur-sm p-8 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-sky-100">
+                <span className="text-sky-500 text-2xl">📅</span>
+              </div>
+
+              <h2 className="no-data-title text-xl md:text-2xl font-semibold text-slate-800">
+                No lessons scheduled
+              </h2>
+
+              <p className="no-data-text mt-2 text-sm md:text-base text-slate-500">
+                There are no lessons scheduled for this week yet. You can add a
+                new lesson from the button above.
+              </p>
+            </div>
+          </div>
         ) : (
+          // ✅ في داتا → اعرض الجدول زي ما هو
           <div className="schedule-content">
             <div className="week-info">
               <h3 className="week-title">
