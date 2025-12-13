@@ -366,7 +366,6 @@
 
 // export default Sidebar;
 
-
 "use client";
 
 import {
@@ -596,7 +595,7 @@ const Sidebar = ({ colors, sidebarOpen, setSidebarOpen }) => {
   return (
     <div
       className={`
-        fixed inset-y-0 left-0 z-50 w-80
+        fixed inset-y-0 left-0 z-50 lg:z-0 w-80
         transform bg-white border-r border-dashed border-gray-200
         transition-transform duration-300 ease-in-out
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
@@ -699,9 +698,7 @@ const Sidebar = ({ colors, sidebarOpen, setSidebarOpen }) => {
                                 ? "text-white"
                                 : "text-gray-600 hover:bg-gray-100"
                             }`}
-                            style={
-                              pathname === child.href ? activeStyles : {}
-                            }
+                            style={pathname === child.href ? activeStyles : {}}
                           >
                             <child.icon className="w-4 h-4 mr-2" />
                             {child.name}

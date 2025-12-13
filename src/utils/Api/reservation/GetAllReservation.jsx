@@ -29,7 +29,7 @@ async function fetchReserved() {
   const token = localStorage.getItem("AccessToken");
 
   const res = await axios.get(
-    `${BASE_URL}/meeting_resrvations/select_meeting_resrvations.php`,
+    `${BASE_URL}/meeting_resrvations/select_meeting_resrved.php`,
     {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     }
