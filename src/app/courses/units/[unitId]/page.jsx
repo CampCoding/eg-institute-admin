@@ -25,6 +25,9 @@ import DeleteModal from "@/components/DeleteModal/DeleteModal";
 import axios from "axios";
 import { BASE_URL } from "../../../../utils/base_url";
 import toast from "react-hot-toast";
+import Link from "next/link";
+import { useDispatch } from "react-redux";
+import { setUnit } from "../../../../utils/Store/UnitsSlice";
 
 /** Utility: format total minutes like 125 -> "2h 5m" */
 const fmtMinutes = (mins = 0) => {
@@ -53,6 +56,7 @@ export default function courseUnitsPage() {
   const [allUnits, setAllUnits] = useState([]);
   const [allCourses, setAllCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState({});
+  const dispatch = useDispatch();
 
   // 👇 status modal state
   const [openStatusModal, setOpenStatusModal] = useState(null); // holds unit object or null
@@ -65,7 +69,7 @@ export default function courseUnitsPage() {
 
     setLoading(true);
     axios
-      .get(BASE_URL + "/courses/select_live_courses.php", {
+      .get(BASE_URL + "/courses/select_courses.php", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -105,13 +109,13 @@ export default function courseUnitsPage() {
       .catch((e) => console.log(e))
       .finally(() => setLoading(false));
   }, [id]);
+  console.log(setAllUnits);
 
   // Local demo course meta (progress calculation etc.)
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    const found =
-      courses?.find((c) => String(c?.id) === String(id)) ?? null;
+    const found = courses?.find((c) => String(c?.id) === String(id)) ?? null;
 
     setcourse(found);
     setLoading(false);
@@ -152,9 +156,7 @@ export default function courseUnitsPage() {
     [completed]
   );
   const progress =
-    totalLessons > 0
-      ? Math.round((completedCount / totalLessons) * 100)
-      : 0;
+    totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
   const toggleUnit = (unitId) =>
     setExpanded((s) => ({ ...s, [unitId]: !s[unitId] }));
@@ -226,6 +228,7 @@ export default function courseUnitsPage() {
     );
   }
   // 👆 END LOADING HANDLER
+  console.log(selectedCourse);
 
   return (
     <div className="min-h-screen">
@@ -368,14 +371,26 @@ export default function courseUnitsPage() {
                         {unit?.unit_id}
                       </div>
                       <div className="text-left">
-                        <h3 className="font-semibold">{unit?.unit_title}</h3>
+                        <div>
+                          <Link
+                            href={`/courses/units/${id}/unit-detail/${unit?.unit_id}`}
+                            onClick={() => {
+                              dispatch(setUnit(unit));
+                            }}
+                            className="font-medium text-slate-900"
+                          >
+                            {unit?.unit_title}
+                          </Link>
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-3 items-center">
                       {/* Status toggle */}
                       <Tooltip
                         title={
-                          unit?.hidden =="1" ? "Show this unit" : "Hide this unit"
+                          unit?.hidden == "1"
+                            ? "Show this unit"
+                            : "Hide this unit"
                         }
                       >
                         <button
@@ -383,7 +398,7 @@ export default function courseUnitsPage() {
                           onClick={() => setOpenStatusModal(unit)}
                           className="p-1 rounded-md hover:bg-slate-100"
                         >
-                          {unit?.hidden =="1" ? (
+                          {unit?.hidden == "1" ? (
                             <EyeOff size={15} />
                           ) : (
                             <Eye size={15} />
@@ -513,7 +528,9 @@ export default function courseUnitsPage() {
         <div className="fixed inset-0 !z-[9999999999] flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
             <h3 className="text-lg font-semibold">
-              {openStatusModal?.hidden == "1" ? "Show this unit?" : "Hide this unit?"}
+              {openStatusModal?.hidden == "1"
+                ? "Show this unit?"
+                : "Hide this unit?"}
             </h3>
             <p className="mt-2 text-sm text-slate-600">
               {openStatusModal?.hidden == "1"

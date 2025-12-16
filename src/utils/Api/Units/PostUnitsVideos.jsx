@@ -4,8 +4,13 @@ import { BASE_URL } from "../../base_url";
 import axios from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-async function postReservation({ payload }) {
+async function postUnitsVideos({ payload, type = "add", id }) {
   const body = { ...payload };
+
+  if (type === "update") {
+    body.video_id = id;
+  }
+  console.log(body);
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("AccessToken") : null;
@@ -16,7 +21,7 @@ async function postReservation({ payload }) {
   }
 
   const { data } = await axios.post(
-    `${BASE_URL}/meeting_resrvations/add_meeting_resrvation.php`,
+    `${BASE_URL}/units/content/videos/${type}_video.php`,
     body,
     {
       headers: {
@@ -28,11 +33,11 @@ async function postReservation({ payload }) {
   return data;
 }
 
-export default function usePostReservation() {
+export default function usePostUnitsVideos() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: postReservation,
+    mutationFn: postUnitsVideos,
     retry: 1,
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["reservations"] });

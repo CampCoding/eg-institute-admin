@@ -4,6 +4,7 @@ import { BASE_URL } from "../../base_url";
 
 async function fetchReservations() {
   const token = localStorage.getItem("AccessToken");
+  console.log(token);
 
   const res = await axios.get(
     `${BASE_URL}/meeting_resrvations/select_meeting_resrvations.php`,
@@ -21,6 +22,7 @@ export function useGetAllReservation() {
     queryFn: fetchReservations,
     refetchOnWindowFocus: false,
     retry: 1,
+    staleTime: 5 * 60 * 1000,
     enabled:
       typeof window !== "undefined" && !!localStorage.getItem("AccessToken"),
   });
@@ -35,6 +37,7 @@ async function fetchReserved() {
     }
   );
 
+
   return res.data;
 }
 
@@ -44,6 +47,7 @@ export function useGetAllReserved() {
     queryFn: fetchReserved,
     refetchOnWindowFocus: false,
     retry: 1,
+    staleTime: 5 * 60 * 1000,
     enabled:
       typeof window !== "undefined" && !!localStorage.getItem("AccessToken"),
   });

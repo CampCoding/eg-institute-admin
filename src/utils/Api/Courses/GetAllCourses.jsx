@@ -2,22 +2,23 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { BASE_URL } from "../../base_url";
 
-async function fetchGroups() {
+async function fetchCourses() {
   const token = localStorage.getItem("AccessToken");
 
-  const res = await axios.get(`${BASE_URL}/groups/select_groups.php`, {
+  const res = await axios.get(`${BASE_URL}/courses/select_courses.php`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 
   return res.data;
 }
 
-export default function useGetAllGroups() {
+export function useGetAllCourses() {
   return useQuery({
-    queryKey: ["Groups"],
-    queryFn: fetchGroups,
+    queryKey: ["courses"],
+    queryFn: fetchCourses,
     refetchOnWindowFocus: false,
     retry: 1,
+    staleTime: 5 * 60 * 1000,
     enabled:
       typeof window !== "undefined" && !!localStorage.getItem("AccessToken"),
   });

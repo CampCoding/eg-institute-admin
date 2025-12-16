@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import { courses as seedCourses } from "@/utils/data";
+
 import { useRouter } from "next/navigation";
 import { Trash, Pencil, EyeOff, Eye, Info } from "lucide-react";
 import axios from "axios";
@@ -12,57 +12,36 @@ import toast from "react-hot-toast";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
+import { useGetAllCourses } from "../../utils/Api/Courses/GetAllCourses";
+import { Toggle } from "../../utils/Api/Toggle";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function CoursesPage() {
   const router = useRouter();
   const [allCoursesLoading, setAllCoursesLoading] = useState(false);
   const [allCoursesData, setAllCoursesData] = useState([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const queryClient = useQueryClient();
   // Start from provided dataset (not actually used after fetch)
-  const [data, setData] = useState(seedCourses);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
-
-  function handleGetAllCourses() {
-    const token = localStorage.getItem("AccessToken");
-    try {
-      setAllCoursesLoading(true);
-      axios
-        .get(BASE_URL + "/courses/select_live_courses.php", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-        .then((res) => {
-          if (res?.data?.status === "success") {
-            setAllCoursesData(res?.data?.message || []);
-          }
-        })
-        .catch((e) => console.log(e))
-        .finally(() => setAllCoursesLoading(false));
-    } catch (err) {
-      console.log(err);
-      setAllCoursesLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    handleGetAllCourses();
-  }, []);
+  const { isLoading, data } = useGetAllCourses();
+  console.log(data);
 
   const filtered = useMemo(() => {
     const q = (searchTerm || "").trim().toLowerCase();
-    if (!q) return allCoursesData;
-    return allCoursesData?.filter(
+    if (!q) return data?.message;
+    return data?.message?.filter(
       (c) =>
         c?.course_name?.toLowerCase().includes(q) ||
         c?.course_descreption?.toLowerCase().includes(q) ||
         c?.level?.toLowerCase().includes(q)
     );
-  }, [allCoursesData, searchTerm]);
+  }, [data?.message, searchTerm]);
 
-  function handleDelete() {
+  const handleDelete = async () => {
     const token = localStorage.getItem("AccessToken");
     setDeleteLoading(true);
 
@@ -75,33 +54,22 @@ export default function CoursesPage() {
       course_id: selectedCourse?.course_id,
     };
 
-    axios
-      .post(BASE_URL + "/courses/toggle_course.php", data_send, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      .then((res) => {
-        if (res?.data?.status === "success") {
-          toast.success(res?.data?.message || "Status updated");
-          setOpenDeleteModal(false);
-          setSelectedCourse(null);
-          // Refresh list to reflect new status
-          handleGetAllCourses();
-        } else {
-          toast.error(res?.data?.message || "Failed to update status");
-        }
-      })
-      .catch((e) => {
-        console.log(e);
-        toast.error("Something went wrong");
-      })
-      .finally(() => setDeleteLoading(false));
-  }
-
-  useEffect(() => {
-    console.log(filtered);
-  }, [filtered]);
+    try {
+      const res = await Toggle({
+        payload: data_send,
+        url: "courses/toggle_course.php",
+        queryClient,
+        key: "courses",
+      });
+      if (res.status === "success") {
+        toast.success(res.message);
+      } else {
+        toast.error(res.message);
+      }
+      setDeleteLoading(false);
+      setOpenDeleteModal(false);
+    } catch (error) {}
+  };
 
   if (allCoursesLoading) {
     return (
@@ -241,11 +209,14 @@ export default function CoursesPage() {
                 </button>
 
                 {/* Edit icon */}
-                <button 
-                title="Details"
-                className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
-                onClick={() => router.push(`/courses/details/${c.course_id ?? c.id}`)}>
-                  <Info  size={18}/>
+                <button
+                  title="Details"
+                  className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
+                  onClick={() =>
+                    router.push(`/courses/details/${c.course_id ?? c.id}`)
+                  }
+                >
+                  <Info size={18} />
                 </button>
                 <button
                   onClick={() =>
@@ -267,10 +238,12 @@ export default function CoursesPage() {
                   className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
                   aria-label="Toggle course status"
                   title={
-                    c?.hidden === "1" || c?.hidden === 1 ? "Show course" : "Hide course"
+                    c?.hidden === "1" || c?.hidden === 1
+                      ? "Show course"
+                      : "Hide course"
                   }
                 >
-                  {c?.hidden? <Eye size={18}/>:<EyeOff size={18} /> }
+                  {c?.hidden ? <Eye size={18} /> : <EyeOff size={18} />}
                 </button>
               </div>
             </div>
@@ -298,7 +271,7 @@ export default function CoursesPage() {
           sx={{
             width: "100%",
           }}
-          className="rounded-md shadow-lg max-w-md mx-auto bg-white"
+          className="rounded-md shadow-lg max-w-full p-4 mx-auto bg-white"
         >
           <Typography
             id="modal-modal-title"

@@ -67,12 +67,12 @@
 
 // export default DashLayout;
 
-
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Sidebar from "./Sidebar/Sidebar";
 import DashboardHeader from "./DashboardHeader/DashboardHeader";
+import useRefreshToken from "../utils/Api/RefreshToken";
 
 const DashLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -98,15 +98,33 @@ const DashLayout = ({ children }) => {
   }
 
   if (!AccessToken) {
-    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/login"
+    ) {
       window.location.href = "/login";
     }
     return <>{children}</>;
   }
 
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const response = await useRefreshToken();
+      if (response.status === "success") {
+        localStorage.setItem("AccessToken", response?.access_token);
+      } else {
+        clearInterval(interval);
+        localStorage.removeItem("AccessToken");
+        localStorage.removeItem("RefreshToken");
+        localStorage.removeItem("UserId");
+        window.location.href = "/login";
+      }
+    }, 15 * 60 * 1000);
+  }, []);
+
   return (
     <div
-      className="min-h-screen !overflow-x-hidden flex"
+      className="min-h-screen  overflow-x-hidden   flex"
       style={{ backgroundColor: colors.background }}
     >
       {/* Mobile overlay */}
@@ -125,19 +143,17 @@ const DashLayout = ({ children }) => {
       />
 
       {/* Right side: header + content */}
-      <div className="flex flex-col flex-1 min-h-screen lg:ml-80">
+      <div className="flex flex-col flex-1 min-h-screen min-w-0 lg:ml-80">
         <DashboardHeader colors={colors} setSidebarOpen={setSidebarOpen} />
 
         {/* scrollable main content */}
-        <main className="relative flex-1 min-h-0 bg-white shadow-2xl m-5 rounded-2xl p-4 sm:p-6">
+        <main className="relative flex-1 min-h-0 min-w-0 bg-white shadow-2xl m-5 rounded-2xl p-4 sm:p-6">
           {/* gradient background blobs */}
           <div className="pointer-events-none absolute w-30 h-30 rounded-full bg-gradient-to-br from-teal-400 blur-3xl via-teal-600 to-teal-800 -top-10 -right-10" />
           <div className="pointer-events-none absolute w-30 h-30 rounded-full bg-gradient-to-bl from-[#4ade80] blur-3xl via-[#349b5a] to-[#1e5933] -bottom-0 -left-0" />
 
           {/* actual page content */}
-          <div className="relative z-10">
-            {children}
-          </div>
+          <div className="relative z-10">{children}</div>
         </main>
       </div>
     </div>

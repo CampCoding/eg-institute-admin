@@ -609,7 +609,7 @@ export default function Page() {
             <button
               type="submit"
               disabled={addLoading}
-              className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all disabled:opacity-60"
+              className="px-6 py-2 rounded-lg bg-blue-600 !text-white hover:bg-blue-700 shadow-md transition-all disabled:opacity-60"
             >
               {addLoading ? "Saving..." : "Save Group"}
             </button>

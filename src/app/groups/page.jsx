@@ -17,17 +17,18 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
-import useGetAllGroups from "../../utils/Api/Courses/GetAllGroups";
+
 import axios from "axios";
 import { Spin } from "antd";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../../utils/base_url";
-
+import useGetAllGroups from "../../utils/Api/Groups/GetAllGroups";
 
 export default function Page() {
   const [groups, setGroups] = useState([]);
   const { data, isLoading } = useGetAllGroups();
   const [deleteLoading, setDeleteLoading] = useState(false);
+  console.log(data);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all"); // all | active | completed | inactive
@@ -63,7 +64,7 @@ export default function Page() {
   );
 
   const getStatusStyle = (status) => {
-    const map= {
+    const map = {
       active: "bg-green-50 text-green-700 ring-green-200",
       completed: "bg-blue-50 text-blue-700 ring-blue-200",
       inactive: "bg-slate-50 text-slate-700 ring-slate-200",
@@ -140,7 +141,7 @@ export default function Page() {
         setGroups((prev) => prev.filter((g) => g.id !== rowData.id));
         setOpenDeleteModal(false);
       } else {
-        toast.error(res?.data?.message)
+        toast.error(res?.data?.message);
       }
     } catch (err) {
       console.error("Delete error:", err);
@@ -150,15 +151,13 @@ export default function Page() {
     }
   };
 
-  if(isLoading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <Spin spinning size="large"/>
+        <Spin spinning size="large" />
       </div>
-    )
+    );
   }
-
- 
 
   return (
     <div className="min-h-screen">
@@ -171,9 +170,7 @@ export default function Page() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() =>
-                setViewMode(viewMode === "grid" ? "list" : "grid")
-              }
+              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
               title={viewMode === "grid" ? "List view" : "Grid view"}
             >

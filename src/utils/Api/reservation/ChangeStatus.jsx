@@ -16,7 +16,7 @@ async function changeReservationStatus({ payload }) {
   }
 
   const { data } = await axios.post(
-    `${BASE_URL}/meeting_resrvations/add_meeting_resrvation.php`,
+    `${BASE_URL}/meeting_resrvations/change_status.php`,
     body,
     {
       headers: {

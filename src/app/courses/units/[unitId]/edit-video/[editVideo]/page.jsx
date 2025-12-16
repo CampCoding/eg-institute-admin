@@ -1,92 +1,161 @@
-'use client';
-import React, { useState, useEffect } from "react";
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { courses } from "@/utils/data"; // assuming the courses data is imported from here
-import { ArrowLeft, Plus, Save, X } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
+import { courses } from "@/utils/data";
+
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import { uploadImage } from "@/utils/FileUpload/FileUpload";
+import usePostUnitsVideos from "@/utils/Api/Units/PostUnitsVideos";
+import toast from "react-hot-toast";
+
+const schema = yup.object({
+  name: yup.string().trim().required("Video title is required"),
+  videoUrl: yup.string().trim().required("Video link is required"),
+  duration: yup
+    .string()
+    .trim()
+    .required("Duration is required")
+    // يقبل: "90" أو "90 min" أو "01:30" أو "1h 30m"
+    .matches(
+      /^(\d+(\s?(min|mins|minute|minutes))?|(\d{1,2}:\d{2})|(\d+\s?h(\s?\d+\s?m)?)|(\d+\s?m))$/i,
+      "Duration format example: 90 min, 01:30, 1h 30m"
+    ),
+
+  imageMode: yup.string().oneOf(["upload", "url"]).required(),
+
+  imageUrl: yup.string().when("imageMode", {
+    is: "url",
+    then: (s) =>
+      s
+        .trim()
+        .required("Image URL is required")
+        .url("Please enter a valid image URL"),
+    otherwise: (s) => s.trim().nullable(),
+  }),
+
+  imageFile: yup.mixed().when("imageMode", {
+    is: "upload",
+    then: (s) =>
+      s
+        .required("Image file is required")
+        .test("fileType", "Only images are allowed", (file) => {
+          if (!file) return false;
+          return file instanceof File && file.type?.startsWith("image/");
+        })
+        .test("fileSize", "Max size is 5MB", (file) => {
+          if (!file) return false;
+          return file.size <= 5 * 1024 * 1024;
+        }),
+    otherwise: (s) => s.nullable(),
+  }),
+});
 
 export default function AddVideoPage() {
   const { unitId } = useParams();
   const router = useRouter();
+  const { mutateAsync, isPending } = usePostUnitsVideos();
 
-  const [course, setCourse] = useState(
-    courses?.find((c) => c.id === parseInt(unitId))
+  const course = useMemo(
+    () => courses?.find((c) => c.id === Number(unitId)),
+    [unitId]
   );
-  
-  const [unit, setUnit] = useState({
-    name: "",
-    unitNumber: course?.units?.length + 1 || 1,
-    videos: [""], // Store video links here
-    pdfs: [], // Store PDF files here
+
+  const defaultValues = useMemo(
+    () => ({
+      name: "",
+      videoUrl: "",
+      duration: "",
+      imageMode: "upload", // default
+      imageFile: null,
+      imageUrl: "",
+    }),
+    []
+  );
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    defaultValues,
+    resolver: yupResolver(schema),
+    mode: "onBlur",
   });
+  const item = JSON.parse(localStorage.getItem("video"));
 
-  // Handle input change for unit name, videos, and PDFs
-  const handleInputChange = (e, field) => {
-    const { value } = e.target;
-    setUnit((prevUnit) => ({ ...prevUnit, [field]: value }));
-  };
+  const imageMode = watch("imageMode");
+  const imageUrl = watch("imageUrl");
+  const imageFile = watch("imageFile");
+  const [previewSrc, setPreviewSrc] = useState("");
 
-  const handleArrayChange = (e, field, index) => {
-    const { value } = e.target;
-    const updatedArray = [...unit[field]];
-    updatedArray[index] = value;
-    setUnit((prevUnit) => ({ ...prevUnit, [field]: updatedArray }));
-  };
+  // ✅ لما يغيّر المود: صفّر الحقل التاني + يخفيه
+  useEffect(() => {
+    // لو Upload
+    if (imageMode === "upload") {
+      if (imageFile instanceof File) {
+        const objectUrl = URL.createObjectURL(imageFile);
+        setPreviewSrc(objectUrl);
 
-  const addNewVideo = () => {
-    setUnit((prevUnit) => ({ ...prevUnit, videos: [...prevUnit.videos, ""] }));
-  };
-
-  const addNewPdf = () => {
-    setUnit((prevUnit) => ({ ...prevUnit, pdfs: [...prevUnit.pdfs, null] }));
-  };
-
-  const removeVideo = (index) => {
-    const updatedVideos = unit.videos.filter((_, i) => i !== index);
-    setUnit((prevUnit) => ({ ...prevUnit, videos: updatedVideos }));
-  };
-
-  const removePdf = (index) => {
-    const updatedPdfs = unit.pdfs.filter((_, i) => i !== index);
-    setUnit((prevUnit) => ({ ...prevUnit, pdfs: updatedPdfs }));
-  };
-
-  const handleFileChange = (e, index) => {
-    const file = e.target.files[0]; // Get the file selected by the user
-    const updatedPdfs = [...unit.pdfs];
-    updatedPdfs[index] = file; // Set the file object in the array
-    setUnit((prevUnit) => ({ ...prevUnit, pdfs: updatedPdfs }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // Validate fields
-    if (!unit.name || !unit.videos.length) {
-      alert("Please fill out all fields before submitting.");
+        // cleanup
+        return () => URL.revokeObjectURL(objectUrl);
+      }
+      setPreviewSrc("");
       return;
     }
 
-    const newUnit = {
-      ...unit,
-      unitId: course.units.length + 1,
-      unitNumber: course.units.length + 1,
-    };
-
-    const updatedCourse = {
-      ...course,
-      units: [...course.units, newUnit],
-    };
-
-    // Save the updated course (this is a placeholder, replace with your actual saving method)
-    if (typeof window !== "undefined") {
-      const updatedCourses = courses.map((c) =>
-        c.id === course.id ? updatedCourse : c
-      );
-      localStorage.setItem("courses", JSON.stringify(updatedCourses));
+    // لو Link
+    if (imageMode === "url") {
+      setPreviewSrc(imageUrl?.trim() || "");
     }
+  }, [imageMode, imageUrl, imageFile]);
 
-    router.push(`/courses/${course.id}`);
+  useEffect(() => {
+    if (!item) return;
+    console.log(item);
+    reset({
+      name: item.video_title,
+      videoUrl: item.video_player_id,
+      duration: `${item.duration} min`,
+      imageMode: "url",
+      imageUrl: item.video_image,
+    });
+  }, [reset]);
+  const onSubmit = async (values) => {
+    const payload = {
+      video_title: values.name,
+      video_player_id: values.videoUrl,
+      unit_id: unitId,
+
+      duration: Number(values.duration.split(" ")[0]), // in minutes
+    };
+    if (imageMode === "upload") {
+      const fileName = await uploadImage(values.imageFile);
+      console.log(fileName);
+      payload.video_image = fileName;
+    } else {
+      payload.video_image = values.imageUrl;
+    }
+    try {
+      const response = await mutateAsync({
+        payload,
+        type: "update",
+        id: item.video_id,
+      });
+      if (response.status === "success") {
+        toast.success(response.message);
+        router.back();
+      } else {
+        toast.error(response.message);
+      }
+    } catch (error) {}
   };
 
   return (
@@ -102,49 +171,136 @@ export default function AddVideoPage() {
         </button>
       </div>
 
-      <BreadCrumb title="Edit Video" child="Videos" parent="Edit Video" />
+      <BreadCrumb title="Edit Video" child="Edit" parent="Unit Videos" />
 
-      <form onSubmit={handleSubmit} className="mt-3 px-2 sm:px-4 grid gap-6">
-        <div className="rounded-2xl">
-          {/* Unit Title */}
-          <div className="mt-4">
-            <label className="text-sm font-medium">Unit Title</label>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="mt-3 px-2 sm:px-4 grid gap-6"
+      >
+        <div className="rounded-2xl space-y-4">
+          {/* Video Title */}
+          <div>
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium">Video Title</label>
+              {errors.name?.message && (
+                <p className="text-xs text-red-600">{errors.name.message}</p>
+              )}
+            </div>
             <input
-              value={unit.name}
-              onChange={(e) => handleInputChange(e, "name")}
-              placeholder="Enter unit name"
+              {...register("name")}
+              placeholder="Enter video title"
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
             />
           </div>
 
-          {/* Video URL Inputs */}
-          <div className="mt-4 flex flex-col">
-            <label className="text-sm font-medium">Videos Links</label>
-            {unit.videos.map((video, index) => (
-              <div key={index} className="flex items-center gap-4 mt-2">
+          {/* Video Link */}
+          <div>
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium">Video Link</label>
+              {errors.videoUrl?.message && (
+                <p className="text-xs text-red-600">
+                  {errors.videoUrl.message}
+                </p>
+              )}
+            </div>
+            <input
+              {...register("videoUrl")}
+              placeholder="Enter video link"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+            />
+          </div>
+
+          {/* Duration */}
+          <div>
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium">Duration</label>
+              {errors.duration?.message && (
+                <p className="text-xs text-red-600">
+                  {errors.duration.message}
+                </p>
+              )}
+            </div>
+            <input
+              {...register("duration")}
+              placeholder='e.g. "90 min" or "01:30" or "1h 30m"'
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+            />
+          </div>
+
+          {/* Image Mode */}
+          <div className="rounded-xl border border-slate-200 p-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Thumbnail</label>
+              {(errors.imageUrl?.message || errors.imageFile?.message) && (
+                <p className="text-xs text-red-600">
+                  {errors.imageUrl?.message || errors.imageFile?.message}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-2 flex gap-4 text-sm">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
-                  type="text"
-                  value={video}
-                  onChange={(e) => handleArrayChange(e, "videos", index)}
-                  placeholder={`Enter video link ${index + 1}`}
+                  type="radio"
+                  value="upload"
+                  {...register("imageMode")}
+                  className="accent-[var(--primary-color)]"
+                />
+                Upload
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="url"
+                  {...register("imageMode")}
+                  className="accent-[var(--primary-color)]"
+                />
+                Link
+              </label>
+            </div>
+
+            {/* Upload */}
+            {imageMode === "upload" && (
+              <div className="mt-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setValue("imageFile", file, { shouldValidate: true });
+                  }}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                />
+                <p className="!mt-2 text-xs text-slate-500">
+                  PNG/JPG/WebP — max 5MB
+                </p>
+              </div>
+            )}
+
+            {/* URL */}
+            {imageMode === "url" && (
+              <div className="mt-3">
+                <input
+                  {...register("imageUrl")}
+                  placeholder="https://.../image.png"
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
                 />
-                <button
-                  type="button"
-                  onClick={() => removeVideo(index)}
-                  className="bg-red-600 text-white p-2 rounded-full"
-                >
-                  <X size={16} />
-                </button>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={addNewVideo}
-              className="mt-4  w-fit flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700"
-            >
-              <Plus size={16} /> Add another Video
-            </button>
+            )}
+            {previewSrc ? (
+              <div className="mt-3">
+                <div className="text-xs text-slate-500 mb-1">Preview</div>
+                <img
+                  src={previewSrc}
+                  alt="preview"
+                  className="w-full max-h-56 object-contain !rounded-lg border !border-slate-200 bg-slate-50"
+                  onError={() => setPreviewSrc("")}
+                />
+              </div>
+            ) : (
+              <div className="mt-3 text-xs text-slate-500">No preview yet.</div>
+            )}
           </div>
         </div>
 
@@ -152,14 +308,16 @@ export default function AddVideoPage() {
         <div className="flex items-center gap-3 mt-6">
           <button
             type="submit"
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-4 py-2 font-medium hover:opacity-90"
+            disabled={isSubmitting}
+            className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] !text-white px-4 py-2 font-medium hover:opacity-90 disabled:opacity-60"
           >
             <Save size={18} />
-            Save Unit
+            {isSubmitting ? "Saving..." : "Save Unit"}
           </button>
+
           <button
             type="button"
-            onClick={() => router.push(`/courses/${course.id}`)}
+            onClick={() => router.back()}
             className="rounded-xl border border-slate-200 px-4 py-2 hover:bg-slate-50"
           >
             Cancel

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-export async function uploadImage(file) {
+export async function uploadImage(file, image) {
   if (!file) throw new Error("No file selected");
 
   const formData = new FormData();

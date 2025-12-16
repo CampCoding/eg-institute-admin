@@ -430,11 +430,11 @@ const links = [
 
   {
     id: 4,
-    label: "Live Courses",
+    label: "Courses",
     icon: BookCopy,
     href: "/courses",
     children: [
-      { id: 1, name: "All Live Courses", icon: BookCopy, href: "/courses" },
+      { id: 1, name: "All  Courses", icon: BookCopy, href: "/courses" },
       { id: 2, name: "Add Course", icon: CirclePlus, href: "/courses/add" },
     ],
   },
@@ -515,7 +515,7 @@ const links = [
 
   {
     id: 12,
-    label: "Courses",
+    label: "Live Courses",
     icon: BookOpen,
     href: "/live-courses",
     children: [

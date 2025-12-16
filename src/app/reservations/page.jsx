@@ -25,33 +25,7 @@ import toast from "react-hot-toast";
 import AddReservationModal from "./AddModel";
 import { set } from "react-hook-form";
 import { Dropdown } from "antd";
-
-const STATUS_STYLES = {
-  pending: {
-    dot: "bg-yellow-500",
-    pill: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    icon: <CalendarClock className="w-4 h-4" />,
-    label: "Pending",
-    color: "border-yellow-200",
-    text: "text-yellow-500",
-  },
-  accepted: {
-    dot: "bg-emerald-600",
-    pill: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    icon: <Clock className="w-4 h-4" />,
-    label: "accepted",
-    color: "border-emerald-200",
-    text: "text-emerald-600",
-  },
-  rejected: {
-    dot: "bg-rose-600",
-    pill: "bg-rose-50 text-rose-700 border-rose-200",
-    icon: <XCircle className="w-4 h-4" />,
-    label: "rejected",
-    color: "border-rose-200",
-    text: "text-rose-600",
-  },
-};
+import useChangeReservationStatus from "../../utils/Api/reservation/ChangeStatus";
 
 function normalizeMeeting(m) {
   const id = m.meeting_resrvations_id;
@@ -73,25 +47,71 @@ function normalizeMeeting(m) {
     teacher: { name: "—", avatar: null },
   };
 }
+const STATUS_STYLES = {
+  pending: {
+    dot: "bg-yellow-500",
+    pill: "bg-yellow-50 text-yellow-800 border-yellow-200",
+    icon: <CalendarClock className="w-4 h-4" />,
+    label: "Pending",
+    color: "border-yellow-400",
+    text: "text-yellow-700",
+  },
+
+  accepted: {
+    dot: "bg-emerald-600",
+    pill: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    icon: <Check className="w-4 h-4" />,
+    label: "Accepted",
+    color: "border-green-200",
+    text: "text-emerald-700",
+  },
+
+  rejected: {
+    dot: "bg-rose-600",
+    pill: "bg-rose-50 text-rose-700 border-rose-200",
+    icon: <X className="w-4 h-4" />,
+    label: "Rejected",
+    color: "border-rose-500",
+    text: "text-rose-700",
+  },
+
+  completed: {
+    dot: "bg-green-600",
+    pill: "bg-green-50 text-green-700 border-green-200",
+    icon: <CircleCheck className="w-4 h-4" />,
+    label: "Completed",
+    color: "border-green-500",
+    text: "text-green-700",
+  },
+};
 
 export default function ProfileReservation() {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("reserved"); // reserved | reservations
   const [openId, setOpenId] = useState(null);
-  const [reservation, setReservation] = useState(null);
+
   const [open, setOpen] = useState(false);
-  const [openChange, setOpenChange] = useState(false);
+  const [changingId, setChangingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [statusValue, setStatusValue] = useState(null);
+
   const qReservations = useGetAllReservation();
   const qReserved = useGetAllReserved();
+  console.log(qReservations.data);
+  
 
   const { mutateAsync, isPending } = useDeleteReservation();
+  const { mutateAsync: changeReservationStatus, isPending: isPendingChange } =
+    useChangeReservationStatus();
+
   useEffect(() => {
     setQuery("");
     setFilter("all");
   }, [tab]);
+  useEffect(() => {
+    console.log("changingId changed:", changingId);
+  }, [changingId]);
+
   // ✅ لو API بيرجع Array مباشرة
   const reservationsList = useMemo(() => {
     const arr = Array.isArray(qReservations.data?.message)
@@ -195,6 +215,29 @@ export default function ProfileReservation() {
     }
   };
 
+  const onConfirmChange = async (id, status) => {
+    if (!id) return;
+    const _id = String(id);
+    setChangingId(_id);
+    const payload = {
+      reservation_id: id,
+      status: status,
+    };
+    console.log(payload);
+
+    try {
+      const res = await changeReservationStatus({ payload });
+      console.log(res);
+      if (res?.status === "success") {
+        toast.success(
+          res?.message || "Reservation status changed successfully!"
+        );
+      } else {
+        toast.error(res?.message || "Failed to change reservation status");
+      }
+    } catch (error) {}
+  };
+
   return (
     <div className="min-h-screen">
       <BreadCrumb
@@ -219,7 +262,7 @@ export default function ProfileReservation() {
         <>
           {/* Tabs + Controls */}
           <div className="mb-4 mt-5 flex flex-col gap-4">
-            <div className="flex justify-center sm:justify-between gap-5   items-center">
+            <div className="flex justify-center flex-wrap sm:justify-between gap-5   items-center">
               <div className="inline-flex rounded-full bg-gray-100 p-1">
                 <button
                   onClick={() => setTab("reserved")}
@@ -246,7 +289,7 @@ export default function ProfileReservation() {
                 </button>
               </div>
               {tab === "reservations" && (
-                <div className=" flex justify-center ">
+                <div className=" flex place-self-start md:justify-center ">
                   <button
                     onClick={() => setOpen(true)}
                     className=" px-4 py-2 bg-teal-600 !whitespace-nowrap !text-white rounded-lg hover:bg-teal-700 transition-colors duration-200 flex items-center gap-2"
@@ -437,14 +480,23 @@ export default function ProfileReservation() {
                           )}
                         </button>
                       )}
-                      {tab === "reservations" && (
-                        <Dropdown menu={{ items }} trigger={["click"]}>
-                          <a
-                            onClick={(e) => {
-                              e.preventDefault();
-                            }}
-                          >
-                            <SquarePen />
+                      {tab === "reservations" && r.status !== "rejected" && (
+                        <Dropdown
+                          menu={{
+                            items,
+                            onClick: ({ key }) => {
+                              onConfirmChange(r.id, String(key));
+                            },
+                          }}
+                          trigger={["click"]}
+                          placement="bottomRight"
+                        >
+                          <a onClick={(e) => e.preventDefault()}>
+                            {isPendingChange && changingId === String(r.id) ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <SquarePen className="w-5 h-5" />
+                            )}
                           </a>
                         </Dropdown>
                       )}

@@ -4,8 +4,12 @@ import { BASE_URL } from "../../base_url";
 import axios from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-async function postReservation({ payload }) {
+async function postGroup({ payload, type = "add", id }) {
   const body = { ...payload };
+
+  if (type === "edit") {
+    body.teacher_id = id;
+  }
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("AccessToken") : null;
@@ -16,7 +20,7 @@ async function postReservation({ payload }) {
   }
 
   const { data } = await axios.post(
-    `${BASE_URL}/meeting_resrvations/add_meeting_resrvation.php`,
+    `${BASE_URL}/groups/${type}_group.php`,
     body,
     {
       headers: {
@@ -28,14 +32,20 @@ async function postReservation({ payload }) {
   return data;
 }
 
-export default function usePostReservation() {
+export default function usePostCourse() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: postReservation,
+    mutationFn: postGroup,
     retry: 1,
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["reservations"] });
+      // ✅ revalidate teachers list
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+
+      // ✅ revalidate teacher details (لو بتستخدمه)
+      if (variables?.id) {
+        queryClient.invalidateQueries({ queryKey: ["courses", variables.id] });
+      }
     },
   });
 }
