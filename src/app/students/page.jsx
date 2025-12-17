@@ -275,7 +275,7 @@ export default function StudentsPage() {
 
         {/* Statistics Cards */}
         <div className="grid px-2 sm:px-4 mt-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
+          {stats?.map((stat, index) => (
             <div
               key={index}
               className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200"
@@ -361,7 +361,7 @@ export default function StudentsPage() {
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Groups</option>
-                {uniqueGroups.map((group) => (
+                {uniqueGroups?.map((group) => (
                   <option key={group} value={group}>
                     Group {group}
                   </option>
@@ -374,7 +374,7 @@ export default function StudentsPage() {
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Levels</option>
-                {uniqueLevels.map((level) => (
+                {uniqueLevels?.map((level) => (
                   <option key={level} value={level}>
                     {level.charAt(0).toUpperCase() + level.slice(1)}
                   </option>
@@ -435,7 +435,7 @@ export default function StudentsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStudents.map((student) => (
+                    {filteredStudents?.map((student) => (
                       <tr
                         key={student.id}
                         className="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200"
@@ -549,7 +549,7 @@ export default function StudentsPage() {
             ) : (
               /* Grid View */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredStudents.map((student) => (
+                {filteredStudents?.map((student) => (
                   <div
                     key={student.id}
                     className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow duration-200"
@@ -640,7 +640,7 @@ export default function StudentsPage() {
               </div>
             )}
 
-            {filteredStudents.length === 0 && (
+            {filteredStudents?.length === 0 && (
               <div className="text-center py-12">
                 <UserOutlined className="text-4xl text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -654,15 +654,15 @@ export default function StudentsPage() {
           </div>
 
           {/* Pagination */}
-          {filteredStudents.length > 0 && (
+          {filteredStudents?.length > 0 && (
             <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
               <div className="text-sm text-gray-700">
                 Showing <span className="font-medium">1</span> to{" "}
                 <span className="font-medium">
-                  {Math.min(10, filteredStudents.length)}
+                  {Math.min(10, filteredStudents?.length)}
                 </span>{" "}
                 of{" "}
-                <span className="font-medium">{filteredStudents.length}</span>{" "}
+                <span className="font-medium">{filteredStudents?.length}</span>{" "}
                 results
               </div>
               <div className="flex gap-2">

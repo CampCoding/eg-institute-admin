@@ -150,9 +150,6 @@ export default function BlogsPage() {
       await handleDelete(toDeleteId);
 
       // 4) حدّث localStorage بعد نجاح الحذف
-      const drafts = JSON.parse(localStorage.getItem("blogDrafts") || "[]");
-      const next = drafts.filter((b) => b.blog_id !== toDeleteId);
-      localStorage.setItem("blogDrafts", JSON.stringify(next));
     } catch (e) {
       // 5) لو فشل: رجّع الـUI زي ما كان
       setBlogs(prevBlogs);
@@ -187,8 +184,6 @@ export default function BlogsPage() {
     featured
       ? "border-[3px] border-teal-500 shadow-[0_8px_50px_-12px_rgba(20,184,166,0.35)]"
       : "border border-slate-200";
-
-  const accessToken = localStorage.getItem("AccessToken");
 
   const handleToggleBlog = async (id) => {
     const response = await Toggle({
