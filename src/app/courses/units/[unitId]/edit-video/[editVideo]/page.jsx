@@ -151,6 +151,7 @@ export default function AddVideoPage() {
       });
       if (response.status === "success") {
         toast.success(response.message);
+        localStorage.removeItem("video");
         router.back();
       } else {
         toast.error(response.message);

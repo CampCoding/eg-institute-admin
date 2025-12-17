@@ -14,6 +14,8 @@ import {
   BookOpen,
   TrendingUp,
   ChevronDown,
+  UsersRound,
+  BookCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
@@ -23,6 +25,7 @@ import { Spin } from "antd";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../../utils/base_url";
 import useGetAllGroups from "../../utils/Api/Groups/GetAllGroups";
+import Link from "next/link";
 
 export default function Page() {
   const [groups, setGroups] = useState([]);
@@ -67,9 +70,9 @@ export default function Page() {
     const map = {
       active: "bg-green-50 text-green-700 ring-green-200",
       completed: "bg-blue-50 text-blue-700 ring-blue-200",
-      inactive: "bg-slate-50 text-slate-700 ring-slate-200",
+      pending: "bg-amber-50 text-amber-700 ring-amber-200",
     };
-    return map[status] || map.inactive;
+    return map[status] || map.pending;
   };
 
   const catEmoji = (category) => {
@@ -321,7 +324,7 @@ export default function Page() {
         <div
           className={
             viewMode === "grid"
-              ? "mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              ? "mt-6 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
               : "mt-6 space-y-4"
           }
         >
@@ -416,6 +419,17 @@ export default function Page() {
                     className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
                   >
                     <Trash2 size={16} /> Delete
+                  </button>
+                  <button
+                    onClick={() => {}}
+                    className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+                  >
+                    <Link
+                    className=" flex items-center justify-center gap-1"
+                      href={`/groups/GroupQuizzes/${g.id}`}>
+                        
+                      <BookCheck size={16} /> Groups Quizzes
+                    </Link>
                   </button>
                 </div>
               </div>

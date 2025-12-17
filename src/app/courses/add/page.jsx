@@ -41,9 +41,16 @@ const schema = yup.object({
       const n = Number(v);
       return Number.isFinite(n) && n >= 1;
     }),
-  price: yup
+  p_price: yup
     .string()
-    .required("Price is required")
+    .required("Private price is required")
+    .test("is-valid-price", "Price must be >= 0", (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0;
+    }),
+  g_price: yup
+    .string()
+    .required("Group price is required")
     .test("is-valid-price", "Price must be >= 0", (v) => {
       const n = Number(v);
       return Number.isFinite(n) && n >= 0;
@@ -201,14 +208,15 @@ export default function AddCoursePage() {
       .join(", ");
 
     const payload = {
-      type: data.type,
+      type: "offline",
       course_name: data.course_name,
       course_description: data.course_description,
       overview: data.overview,
       level: data.level,
       Duration: data.Duration,
       lessons: String(data.lessons),
-      price: String(data.price),
+      private_price: String(data.p_price),
+      group_price: String(data.g_price),
       image: data.image,
       video: data.video,
       advertising_video: data.advertising_video,
@@ -331,6 +339,36 @@ export default function AddCoursePage() {
                 </div>
 
                 <div>
+                  <label className={labelClass}> Group Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    {...register("g_price")}
+                    className={inputClass}
+                  />
+                  {errors.price && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.price.message}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className={labelClass}> Private Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    {...register("p_price")}
+                    className={inputClass}
+                  />
+                  {errors.price && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.price.message}
+                    </p>
+                  )}
+                </div>
+                <div>
                   <label className={labelClass}>Lessons</label>
                   <input
                     type="number"
@@ -343,31 +381,6 @@ export default function AddCoursePage() {
                       {errors.lessons.message}
                     </p>
                   )}
-                </div>
-
-                <div>
-                  <label className={labelClass}>Price ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    {...register("price")}
-                    className={inputClass}
-                  />
-                  {errors.price && (
-                    <p className="text-xs text-red-500 mt-1">
-                      {errors.price.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className={labelClass}>Type</label>
-                  <select {...register("type")} className={inputClass}>
-                    <option value="Online">Online</option>
-                    <option value="Offline">Offline</option>
-                    <option value="Hybrid">Hybrid</option>
-                  </select>
                 </div>
 
                 <div className="sm:col-span-2">

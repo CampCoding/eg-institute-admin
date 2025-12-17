@@ -13,7 +13,7 @@ import {
 } from "antd";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { ArrowLeft, Star, ChevronRight } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { teacherSchema } from "../../_Schema";
@@ -106,6 +106,7 @@ function toPreview(values) {
 export default function AddTeacherPage() {
   const { mutateAsync, isPending } = usePostTeacher();
   const { teacher } = useSelector((state) => state.Teacher);
+  const { id } = useParams();
 
   const router = useRouter();
 
@@ -185,6 +186,7 @@ export default function AddTeacherPage() {
         : [],
     });
   }, [reset]);
+  console.log(id);
 
   const levelColor = useMemo(() => {
     if (preview.level === "Beginner") return "text-emerald-700";
@@ -215,7 +217,7 @@ export default function AddTeacherPage() {
     console.log(payload);
 
     try {
-      const res = await mutateAsync({ payload, type: "edit", id: teacher.id });
+      const res = await mutateAsync({ payload, type: "edit", id: id });
       console.log(res);
 
       if (res.status === "success") {

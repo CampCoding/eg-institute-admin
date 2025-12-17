@@ -4,14 +4,13 @@ import { BASE_URL } from "../../base_url";
 import axios from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-async function postTeacher({ payload, type = "add", id }) {
+async function postUnitsPdfs({ payload, type = "add", id }) {
   const body = { ...payload };
 
-  if (type === "edit") {
-    body.teacher_id = id;
+  if (type === "update") {
+    body.pdf_id = id;
   }
-  console.log(payload);
-  
+  console.log(body);
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("AccessToken") : null;
@@ -22,7 +21,7 @@ async function postTeacher({ payload, type = "add", id }) {
   }
 
   const { data } = await axios.post(
-    `${BASE_URL}/teachers/${type}_teacher.php`,
+    `${BASE_URL}/units/content/pdfs/${type}_pdf.php`,
     body,
     {
       headers: {
@@ -34,21 +33,14 @@ async function postTeacher({ payload, type = "add", id }) {
   return data;
 }
 
-export default function usePostTeacher() {
+export default function usePostUnitsPdfs() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: postTeacher,
+    mutationFn: postUnitsPdfs,
     retry: 1,
-
     onSuccess: (_data, variables) => {
-      // ✅ revalidate teachers list
-      queryClient.invalidateQueries({ queryKey: ["teachers"] });
-
-      // ✅ revalidate teacher details (لو بتستخدمه)
-      if (variables?.id) {
-        queryClient.invalidateQueries({ queryKey: ["teacher", variables.id] });
-      }
+      queryClient.invalidateQueries({ queryKey: ["unitPdfs"] });
     },
   });
 }

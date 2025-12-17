@@ -10,6 +10,7 @@ import { teachers } from "@/utils/data";
 import axios from "axios";
 import { BASE_URL } from "@/utils/base_url";
 import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const { Dragger } = AntUpload;
 
@@ -18,6 +19,7 @@ const LEVELS = ["Beginner", "Intermediate", "Advanced", "All Levels"];
 export default function EditCoursePage() {
   const router = useRouter();
   const params = useParams();
+  const queryClient = useQueryClient();
   const rawId = useMemo(
     () => (Array.isArray(params?.editId) ? params.editId[0] : params?.editId),
     [params]
@@ -40,17 +42,18 @@ export default function EditCoursePage() {
     level: "Beginner",
     Duration: "12 weeks",
     lessons: "12",
-    price: "50",
+    p_price: "50",
+    g_price: "50",
     image: "",
     video: "",
     advertising_video: "",
     type: "Online",
-    hidden: "0"
+    hidden: "0",
   });
 
   // Overview "What you'll learn"
   const [wiil_learn, setWiilLearn] = useState([]);
-  
+
   // Features
   const [feature, setFeature] = useState([]);
 
@@ -67,28 +70,33 @@ export default function EditCoursePage() {
     bio: "",
   });
 
-  const valid = useMemo(() => !!form.course_name && !!form.course_description, [form]);
+  const valid = useMemo(
+    () => !!form.course_name && !!form.course_description,
+    [form]
+  );
 
   const onChange = (key, val) => setForm((s) => ({ ...s, [key]: val }));
 
   // Load existing course
   useEffect(() => {
     if (!rawId) return;
-    
+
     const fetchCourse = async () => {
       setLoading(true);
       try {
         const token = localStorage.getItem("AccessToken");
         const response = await axios.get(
-          `${BASE_URL}/courses/select_live_courses.php`,
+          `${BASE_URL}/courses/select_courses.php`,
           {
             headers: {
-              "Authorization": `Bearer ${token}`
-            }
+              Authorization: `Bearer ${token}`,
+            },
           }
         );
         if (response.data?.message && Array.isArray(response.data?.message)) {
-          const course = response?.data?.message?.find(c => c.course_id == rawId);
+          const course = response?.data?.message?.find(
+            (c) => c.course_id == rawId
+          );
           console.log(course);
           if (course) {
             // Set form values matching the add page structure
@@ -100,19 +108,23 @@ export default function EditCoursePage() {
               level: course?.level,
               Duration: course?.Duration,
               lessons: course?.lessons?.toString(),
-              price: course?.price,
+              p_price: course?.private_price,
+              g_price: course?.group_price,
               image: course?.image,
               video: course?.video,
               advertising_video: course?.advertising_video,
               type: course?.type,
-              hidden: course?.hidden
+              hidden: course?.hidden,
             });
 
             // Parse wiil_learn from string to array
             if (course.wiil_learn) {
               setWiilLearn(
-                typeof course.wiil_learn === 'string' 
-                  ? course.wiil_learn.split(',').map(item => item.trim()).filter(Boolean)
+                typeof course.wiil_learn === "string"
+                  ? course.wiil_learn
+                      .split(",")
+                      .map((item) => item.trim())
+                      .filter(Boolean)
                   : course.wiil_learn
               );
             }
@@ -120,8 +132,11 @@ export default function EditCoursePage() {
             // Parse feature from string to array
             if (course.feature) {
               setFeature(
-                typeof course.feature === 'string'
-                  ? course.feature.split(',').map(item => item.trim()).filter(Boolean)
+                typeof course.feature === "string"
+                  ? course.feature
+                      .split(",")
+                      .map((item) => item.trim())
+                      .filter(Boolean)
                   : course.feature
               );
             }
@@ -147,18 +162,22 @@ export default function EditCoursePage() {
   const uploadFile = async (file, endpoint, fieldName) => {
     const formData = new FormData();
     formData.append(fieldName, file);
-    
+
     try {
       const token = localStorage.getItem("AccessToken");
-      const response = await axios.post(`https://camp-coding.tech/eg_Institute/${endpoint}`, formData, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "multipart/form-data"
+      const response = await axios.post(
+        `https://camp-coding.tech/eg_Institute/${endpoint}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
         }
-      });
-      
+      );
+
       if (response?.status === 200) {
-        return response.data ;
+        return response.data;
       }
       throw new Error("Upload failed");
     } catch (error) {
@@ -183,11 +202,11 @@ export default function EditCoursePage() {
     }
 
     setImageFile(file);
-    
+
     // For preview
     const imageUrl = URL.createObjectURL(file);
     onChange("image", imageUrl);
-    
+
     return false;
   };
 
@@ -320,21 +339,22 @@ export default function EditCoursePage() {
       // Prepare payload according to API structure (same as add page)
       const payload = {
         course_id: rawId, // Important: send course_id for editing
-        type: form.type || "Online",
+        type: "offline",
         course_name: form.course_name,
         course_description: form.course_description,
         overview: form.overview,
         level: form.level,
         Duration: form.Duration,
         lessons: form.lessons.toString(),
-        price: form.price,
+        private_price: form.p_price,
+        group_price: form.g_price,
         image: imageUrlToSend,
         video: videoUrlToSend,
         advertising_video: advertisingVideoUrlToSend,
         wiil_learn: wiil_learn.filter(Boolean).join(", "),
         feature: feature.filter(Boolean).join(", "),
         hidden: form.hidden || "0",
-        created_at:Date.now(),
+        created_at: Date.now(),
       };
 
       console.log("Sending payload:", payload);
@@ -354,17 +374,10 @@ export default function EditCoursePage() {
       console.log("Edit response:", response);
 
       if (response?.data?.status === "success") {
+        queryClient.invalidateQueries("courses");
         toast.success(response.data.message || "Course updated successfully!");
 
         // Refresh courses list
-        try {
-          await axios.get(`${BASE_URL}/courses/select_live_courses.php`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        } catch (refreshError) {
-          console.log("Refresh courses error:", refreshError);
-        }
-
         router.push("/courses");
       } else {
         toast.error(response?.data?.message || "Failed to update course");
@@ -381,7 +394,8 @@ export default function EditCoursePage() {
   };
 
   // Input styling
-  const inputClass = "mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]";
+  const inputClass =
+    "mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]";
   const labelClass = "text-sm font-medium";
 
   if (loading) {
@@ -438,7 +452,9 @@ export default function EditCoursePage() {
                   <label className={labelClass}>Short Description</label>
                   <textarea
                     value={form?.course_description}
-                    onChange={(e) => onChange("course_description", e.target.value)}
+                    onChange={(e) =>
+                      onChange("course_description", e.target.value)
+                    }
                     rows={3}
                     placeholder="A short overview that appears on cards."
                     className={inputClass}
@@ -447,7 +463,9 @@ export default function EditCoursePage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className={labelClass}>Long Overview (details page)</label>
+                  <label className={labelClass}>
+                    Long Overview (details page)
+                  </label>
                   <textarea
                     value={form.overview}
                     onChange={(e) => onChange("overview", e.target.value)}
@@ -481,6 +499,30 @@ export default function EditCoursePage() {
                     className={inputClass}
                   />
                 </div>
+                <div>
+                  <label className={labelClass}>Group Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.g_price}
+                    onChange={(e) => onChange("g_price", e.target.value)}
+                    placeholder="50"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}> Private Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.p_price}
+                    onChange={(e) => onChange("p_price", e.target.value)}
+                    placeholder="50"
+                    className={inputClass}
+                  />
+                </div>
 
                 <div>
                   <label className={labelClass}>Lessons</label>
@@ -491,32 +533,6 @@ export default function EditCoursePage() {
                     onChange={(e) => onChange("lessons", e.target.value)}
                     className={inputClass}
                   />
-                </div>
-
-                <div>
-                  <label className={labelClass}>Price ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.price}
-                    onChange={(e) => onChange("price", e.target.value)}
-                    placeholder="50"
-                    className={inputClass}
-                  />
-                </div>
-
-                <div>
-                  <label className={labelClass}>Type</label>
-                  <select
-                    value={form.type}
-                    onChange={(e) => onChange("type", e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="Online">Online</option>
-                    <option value="Offline">Offline</option>
-                    <option value="Hybrid">Hybrid</option>
-                  </select>
                 </div>
 
                 <div className="sm:col-span-2">
@@ -606,11 +622,15 @@ export default function EditCoursePage() {
               </h2>
 
               <div>
-                <label className={labelClass}>Advertising Video URL or Upload</label>
+                <label className={labelClass}>
+                  Advertising Video URL or Upload
+                </label>
                 <div className="flex gap-2">
                   <input
                     value={form.advertising_video}
-                    onChange={(e) => onChange("advertising_video", e.target.value)}
+                    onChange={(e) =>
+                      onChange("advertising_video", e.target.value)
+                    }
                     placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
                     className={`${inputClass} flex-1`}
                   />
@@ -814,9 +834,7 @@ export default function EditCoursePage() {
                         {form.lessons} lessons
                       </span>
                     </div>
-                    <span className="font-semibold text-[var(--text-color)]">
-                      ${form.price}
-                    </span>
+                    <span className="font-semibold text-[var(--text-color)]"></span>
                   </div>
                 </div>
               </article>
