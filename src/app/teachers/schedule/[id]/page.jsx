@@ -11,12 +11,13 @@ import {
   message,
 } from "antd";
 import moment from "moment";
-import { PlusIcon } from "lucide-react";
+import { ArrowLeft, PlusIcon } from "lucide-react";
 
 import "./schedule.css";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
-
+import useGetTeacherSchedule from "../../../../utils/Api/Teachers/GetTeacherSchedule";
+import { useParams, useRouter } from "next/navigation";
 const { Option } = Select;
 
 // Simple Loader Component
@@ -33,6 +34,7 @@ const Loader = () => {
 
 const Schedule = () => {
   const [loading, setLoading] = useState(false);
+  const { id } = useParams();
   const [submitting, setSubmitting] = useState(false);
   const [lessons, setLessons] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]);
@@ -44,6 +46,9 @@ const Schedule = () => {
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [showAddLessonModal, setShowAddLessonModal] = useState(false);
   const [addLessonForm] = Form.useForm();
+  const { data: teacherSchedule, isLoading } = useGetTeacherSchedule(id);
+  const router = useRouter();
+  console.log(teacherSchedule, isLoading);
 
   const daysOfWeek = [
     "Saturday",
@@ -162,36 +167,73 @@ const Schedule = () => {
   ];
 
   useEffect(() => {
-    fetchLessons();
-  }, []);
+    if (!teacherSchedule) return;
 
-  const fetchLessons = () => {
-    setLoading(true);
+    // لو react-query لسه بيجيب
+    if (isLoading) return;
 
-    setTimeout(() => {
-      const timeSlotSet = new Set();
-      mockLessons.forEach((lesson) => {
-        const start = moment(lesson.start_time, "HH:mm:ss");
-        const end = moment(lesson.end_time, "HH:mm:ss");
-        const timeSlot = `${start.format("H:mm")} - ${end.format("H:mm")}`;
-        timeSlotSet.add(timeSlot);
-      });
+    // لو مفيش داتا
+    const apiLessons = teacherSchedule?.group_lessons || [];
 
-      const extractedTimeSlots = Array.from(timeSlotSet).sort((a, b) => {
-        const startTimeA = moment(a.split(" - ")[0], "H:mm");
-        const startTimeB = moment(b.split(" - ")[0], "H:mm");
-        return startTimeA.diff(startTimeB);
-      });
+    // ✅ week range من الـ API (زي ما عندك في الريسبونس)
+    setWeekRange({
+      start: teacherSchedule?.week_start || "",
+      end: teacherSchedule?.week_end || "",
+    });
 
-      setTimeSlots(extractedTimeSlots);
-      setLessons(mockLessons);
-      setWeekRange({
-        start: moment().startOf("week").format("YYYY-MM-DD"),
-        end: moment().endOf("week").format("YYYY-MM-DD"),
-      });
-      setLoading(false);
-    }, 1500);
-  };
+    // ✅ Map API shape -> نفس shape اللي UI متوقعه (lesson_date / start_time / end_time / is_group / status ...)
+    const mapped = apiLessons.map((x) => {
+      const duration = moment(x.end_time, "HH:mm:ss").diff(
+        moment(x.start_time, "HH:mm:ss"),
+        "minutes"
+      );
+
+      // API status: "deActive" / "Active" ... انت في UI بتتعامل مع "dnActive"
+      const normalizedStatus =
+        String(x.session_status || "").toLowerCase() === "deactive"
+          ? "dnActive"
+          : "Active";
+
+      return {
+        lesson_id: String(x.schedule_id),
+        lesson_title: x.course_name || "Lesson",
+        course_id: String(x.schedule_id),
+        course_name: x.course_name || x.group_name || "Lesson",
+        lesson_date: x.session_date, // ✅ مهم
+        start_time: x.start_time,
+        end_time: x.end_time,
+        duration,
+        description: x.group_name || "",
+        group_type: "group", // دي group_lessons أصلاً
+        request_type: "scheduled",
+        is_group: true,
+        status: normalizedStatus,
+        zoom_meeting_link: x.zoom_meeting_link || "", // لو مش موجود في API هتبقى فاضية
+        image: x.image, // لو حبيت تستخدمها بعدين
+        day_of_week: x.day_of_week,
+      };
+    });
+
+    // ✅ timeSlots من الدروس
+    const timeSlotSet = new Set();
+    mapped.forEach((lesson) => {
+      const start = moment(lesson.start_time, "HH:mm:ss");
+      const end = moment(lesson.end_time, "HH:mm:ss");
+      timeSlotSet.add(`${start.format("H:mm")} - ${end.format("H:mm")}`);
+    });
+
+    const extractedTimeSlots = Array.from(timeSlotSet).sort((a, b) => {
+      const startTimeA = moment(a.split(" - ")[0], "H:mm");
+      const startTimeB = moment(b.split(" - ")[0], "H:mm");
+      return startTimeA.diff(startTimeB);
+    });
+
+    setLessons(mapped);
+    setTimeSlots(extractedTimeSlots);
+
+    // ✅ استخدم react-query loading بدل loading المحلي
+    setLoading(false);
+  }, [teacherSchedule, isLoading]);
 
   // Check if time slot is available
   const checkTimeSlotAvailability = (selectedDay, startTime, endTime) => {
@@ -435,6 +477,16 @@ const Schedule = () => {
   return (
     <div className="schedule-wrapper">
       <div className="schedule-header-section">
+        <div className="mb-5">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+          >
+            <ArrowLeft size={16} className="inline -mt-0.5 mr-1" />
+            Back
+          </button>
+        </div>
         <div className="flex justify-between items-center">
           <h1 className="schedule-main-title">Schedule Lessons</h1>
           <Button
@@ -448,11 +500,41 @@ const Schedule = () => {
           </Button>
         </div>
       </div>
+      {teacherSchedule && teacherSchedule.length === 0 && (
+        <>
+          <div className="schedule-container">
+            <div className="schedule-grid">
+              <div className="schedule-header">
+                <div className="schedule-cell day-header">Day / Time</div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="page_content">
-        {loading ? (
+        {isLoading ? (
           <Loader />
+        ) : !teacherSchedule || lessons.length === 0 ? (
+          // 🔴 شاشة "مفيش داتا"
+          <div className="no-data-wrapper flex justify-center items-center h-[calc(100vh-130px)] px-4">
+            <div className="no-data-card max-w-md w-full rounded-2xl border border-slate-200 bg-white/70 shadow-sm backdrop-blur-sm p-8 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-sky-100">
+                <span className="text-sky-500 text-2xl">📅</span>
+              </div>
+
+              <h2 className="no-data-title text-xl md:text-2xl font-semibold text-slate-800">
+                No lessons scheduled
+              </h2>
+
+              <p className="no-data-text mt-2 text-sm md:text-base text-slate-500">
+                There are no lessons scheduled for this week yet. You can add a
+                new lesson from the button above.
+              </p>
+            </div>
+          </div>
         ) : (
+          // ✅ في داتا → اعرض الجدول زي ما هو
           <div className="schedule-content">
             <div className="week-info">
               <h3 className="week-title">

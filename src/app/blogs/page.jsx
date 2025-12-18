@@ -2,10 +2,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { useRouter } from "next/navigation";
-import { Bookmark, Trash, Edit } from "lucide-react";
+import { Bookmark, Trash, Edit, Eye, Loader2, EyeClosed } from "lucide-react";
 import DeleteModal from "../../components/DeleteModal/DeleteModal";
 import axios from "axios";
 import { BASE_URL } from "../../utils/base_url";
+import useDeleteBlog from "../../utils/Api/Blogs/DeleteBlog";
+import toast from "react-hot-toast";
+import { Toggle } from "../../utils/Api/Toggle";
+import useGetBlogs from "../../utils/Api/Blogs/GetAllBlogs";
+import { useQueryClient } from "@tanstack/react-query";
 
 // If you have a real blogs file, import it and remove the mock below.
 // import { blogs as initialBlogs } from "@/utils/blogs";
@@ -79,32 +84,23 @@ const initialBlogs = [
 
 export default function BlogsPage() {
   const router = useRouter();
+  const {
+    data: blogs = initialBlogs,
+    isLoading,
+    isError,
+    error,
+  } = useGetBlogs();
 
   // live blogs list (initial + localStorage drafts, de-duplicated by id)
-  const [blogs, setBlogs] = useState([]);
+  const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+
   const [selectedBlog, setSelectedBlog] = useState(null);
 
   // hydrate from localStorage on mount
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      const drafts = JSON.parse(localStorage.getItem("blogDrafts") || "[]");
-      if (Array.isArray(drafts) && drafts.length) {
-        const map = new Map(initialBlogs.map((b) => [b.id, b]));
-        drafts.forEach((d) => map.set(d.id, d)); // prefer drafts when ids collide
-        setBlogs(Array.from(map.values()));
-      } else {
-        setBlogs(initialBlogs);
-      }
-    } catch {
-      setBlogs(initialBlogs);
-    }
-  }, []);
 
   // filter
   const filteredBlogs = useMemo(() => {
@@ -122,23 +118,49 @@ export default function BlogsPage() {
     });
   }, [searchTerm, blogs]);
 
+  const handleDelete = async (blog) => {
+    console.log(blog);
+
+    const response = await useDeleteBlog({ id: blog });
+    if (response.status === "success") {
+      toast.success("Blog deleted successfully!");
+    }
+  };
   // delete selected blog (state + localStorage)
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!selectedBlog) return;
-    const toDeleteId = selectedBlog.id;
 
-    // upcreated_at state
-    setBlogs((prev) => prev.filter((b) => b.id !== toDeleteId));
+    console.log(selectedBlog);
 
-    // upcreated_at localStorage
-    try {
-      const drafts = JSON.parse(localStorage.getItem("blogDrafts") || "[]");
-      const next = drafts.filter((b) => b.id !== toDeleteId);
-      localStorage.setItem("blogDrafts", JSON.stringify(next));
-    } catch {}
+    const toDeleteId = selectedBlog?.blog_id;
+    console.log(toDeleteId);
 
+    // خزن نسخة للـrollback
+    const prevBlogs = blogs;
+
+    // 1) Optimistic update: شيل من UI فورًا
+    setBlogs((prev) => prev.filter((b) => b.blog_id !== toDeleteId));
+
+    // 2) اقفل المودال/فضي الاختيار
     setOpenDeleteModal(false);
     setSelectedBlog(null);
+
+    try {
+      // 3) نفّذ الحذف الحقيقي (استناه)
+      await handleDelete(toDeleteId);
+
+      // 4) حدّث localStorage بعد نجاح الحذف
+    } catch (e) {
+      // 5) لو فشل: رجّع الـUI زي ما كان
+      setBlogs(prevBlogs);
+
+      // اختياري: رجّع المودال أو رسالة
+      // setOpenDeleteModal(true);
+      // setSelectedBlog(prevBlogs.find(b => b.id === toDeleteId) ?? null);
+
+      console.error(e);
+      // toast.error("Delete failed");
+    }
   }
 
   const levelBadgeClass = (levelOrTag) => {
@@ -163,84 +185,56 @@ export default function BlogsPage() {
       ? "border-[3px] border-teal-500 shadow-[0_8px_50px_-12px_rgba(20,184,166,0.35)]"
       : "border border-slate-200";
 
-  const formatcreated_at = (iso) =>
-    new created_at(iso).toLocalecreated_atString(undefined, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+  const handleToggleBlog = async (id) => {
+    const response = await Toggle({
+      payload: { blog_id: id },
+      url: "blogs/toggle_blog.php",
+      queryClient,
+      key: "blogs",
     });
-
-  const accessToken = localStorage.getItem("AdminToken");
-
-  console.log(accessToken);
-
-  const getBlogs = async () => {
-    if (!accessToken) {
-      setError("You are not authorized. Please log in.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await axios.get(`${BASE_URL}/blogs/select_blogs.php`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.data.status === "success") {
-        setBlogs(response.data.message || []);
-      } else {
-        setError(response.data.message || "Failed to load blogs");
-        console.warn("API Warning:", response.data);
-      }
-    } catch (err) {
-      if (err.code === "ECONNABORTED") {
-        setError("Request timeout. Please try again.");
-      } else if (err.response?.status === 401) {
-        setError("Session expired. Please log in again.");
-        localStorage.removeItem("AdminToken");
-        window.location.href = "/login";
-      } else if (err.response?.status === 403) {
-        setError("Access forbidden.");
-      } else {
-        setError(
-          err.response?.data?.message || "Network error. Check your connection."
-        );
-      }
-      console.error("Error fetching blogs:", err);
-    } finally {
-      setLoading(false);
+    if (response.status === "success") {
+      toast.success(response.message);
     }
   };
-
-  useEffect(() => {
-    getBlogs();
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="inline-flex items-center gap-2 text-slate-600">
+          <Loader2 className="animate-spin" /> Loading blogs.....
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
-      <BreadCrumb title="All Blogs" child="Blog" parent="Home" />
+      <BreadCrumb title="All Blogs" child="Blogs" parent="Home" />
 
       {/* Search */}
       <div className="mt-4 w-full">
-        <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2 max-w-full ring-1 ring-slate-200">
-          <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-500">
-            <path
-              fill="currentColor"
-              d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"
+        <div className="flex  gap-2 sm:flex-row items-center justify-between">
+          <div className="flex items-center  rounded-2xl bg-white px-3 py-2 w-full ring-1 ring-slate-200">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-500">
+              <path
+                fill="currentColor"
+                d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"
+              />
+            </svg>
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search blogs"
+              className="bg-transparent outline-none text-sm w-full placeholder:text-slate-500"
             />
-          </svg>
-          <input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search blogs"
-            className="bg-transparent outline-none text-sm w-full placeholder:text-slate-500"
-          />
+          </div>
+          <div className=" flex justify-center ">
+            <button
+              onClick={() => router.push(`/blogs/add`)}
+              className=" px-4 py-2 bg-teal-600 !whitespace-nowrap text-white rounded-lg hover:bg-teal-700 transition-colors duration-200 flex items-center gap-2"
+            >
+              Add Blog
+            </button>
+          </div>
         </div>
       </div>
 
@@ -377,6 +371,13 @@ export default function BlogsPage() {
                   aria-label="Delete blog"
                 >
                   <Trash size={18} />
+                </button>
+                <button
+                  onClick={() => handleToggleBlog(b.blog_id)}
+                  className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
+                  aria-label="Delete blog"
+                >
+                  {b?.hidden == 0 ? <EyeClosed size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>

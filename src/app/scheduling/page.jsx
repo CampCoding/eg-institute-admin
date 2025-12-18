@@ -1,15 +1,8 @@
 "use client";
 import React, { useState, useMemo, useEffect } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import {
-  CalendarDays,
-  Clock,
-  ChevronLeft,
-  ChevronRight,
-  Users,
-  Plus,
-  Search,
-} from "lucide-react";
+import { CalendarDays, Clock, Users } from "lucide-react";
+import { useGetAllPublicSchedule } from "../../utils/Api/public_Sc/GetPublicSc";
 
 const timeSlots = [
   "8:00 AM",
@@ -28,7 +21,6 @@ const timeSlots = [
 const seedReservations = [
   {
     id: 1,
-    day: "Monday",
     date: "2025-08-11",
     time: "10:00 AM",
     type: "session",
@@ -41,115 +33,108 @@ const seedReservations = [
   },
   {
     id: 2,
-    day: "Monday",
     date: "2025-08-11",
     time: "2:00 PM",
     type: "checkout",
     title: "Check Out - Room Cleaning",
     status: "maintenance",
   },
-  {
-    id: 3,
-    day: "Tuesday",
-    date: "2025-08-12",
-    time: "11:00 AM",
-    type: "checkout",
-    title: "Check Out - Equipment Setup",
-    status: "maintenance",
-  },
-  {
-    id: 4,
-    day: "Wednesday",
-    date: "2025-08-13",
-    time: "10:00 AM",
-    type: "session",
-    title: "IELTS Preparation",
-    instructor: "Dr. Ahmed Ali",
-    room: "Room B2",
-    students: 15,
-    maxStudents: 15,
-    status: "full",
-  },
-  {
-    id: 5,
-    day: "Wednesday",
-    date: "2025-08-13",
-    time: "12:00 PM",
-    type: "checkout",
-    title: "Check Out - Maintenance",
-    status: "maintenance",
-  },
-  {
-    id: 6,
-    day: "Thursday",
-    date: "2025-08-14",
-    time: "8:00 AM",
-    type: "checkout",
-    title: "Check Out - Weekly Cleaning",
-    status: "maintenance",
-  },
-  {
-    id: 7,
-    day: "Friday",
-    date: "2025-08-15",
-    time: "1:00 PM",
-    type: "session",
-    title: "Business English",
-    instructor: "Ms. Fatima Hassan",
-    room: "Room C1",
-    students: 6,
-    maxStudents: 10,
-    status: "confirmed",
-  },
-  {
-    id: 8,
-    day: "Saturday",
-    date: "2025-08-16",
-    time: "11:00 AM",
-    type: "session",
-    title: "Kids English Club",
-    instructor: "Ms. Mona Ahmed",
-    room: "Kids Room",
-    students: 12,
-    maxStudents: 12,
-    status: "full",
-  },
-  {
-    id: 9,
-    day: "Sunday",
-    date: "2025-08-10",
-    time: "1:00 PM",
-    type: "session",
-    title: "Grammar Workshop",
-    instructor: "Mr. Omar Khalil",
-    room: "Room A2",
-    students: 5,
-    maxStudents: 8,
-    status: "confirmed",
-  },
 ];
+
+// ---------- Date helpers (NO toISOString bugs) ----------
+const parseISODate = (s) => {
+  if (!s) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d); // local midnight
+};
+
+const formatLocalYMD = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+// fallback week start (Sunday)
+const getLocalWeekStartYMD = (weekOffset = 0) => {
+  const now = new Date();
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayOfWeek = base.getDay(); // 0=Sun
+  const start = new Date(base);
+  start.setDate(base.getDate() - dayOfWeek + weekOffset * 7);
+  return formatLocalYMD(start);
+};
+
+// "13:36:00" -> "1:00 PM" (floors to hour to match your grid)
+const timeHHMMSS_toSlot = (hhmmss) => {
+  if (!hhmmss) return null;
+  const [hhStr] = hhmmss.split(":");
+  let h = Number(hhStr);
+  if (Number.isNaN(h)) return null;
+
+  const isPM = h >= 12;
+  const displayH = ((h + 11) % 12) + 1; // 0->12
+  return `${displayH}:00 ${isPM ? "PM" : "AM"}`;
+};
 
 export default function SchedulingPage() {
   const [currentWeek, setCurrentWeek] = useState(0);
-  const [reservations, setReservations] = useState(seedReservations);
-  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [localReservations, setLocalReservations] = useState(seedReservations);
   const [viewMode, setViewMode] = useState("week");
-  const [activeReservation, setActiveReservation] = useState(null); // NEW
+  const [activeReservation, setActiveReservation] = useState(null);
+  const [creatingSlot, setCreatingSlot] = useState(null);
 
-  // Generate week dates
-  const getWeekDates = (weekOffset = 0) => {
-    const today = new Date();
-    const startOfWeek = new Date(
-      today.setDate(today.getDate() - today.getDay() + weekOffset * 7)
-    );
+  const { data, isLoading } = useGetAllPublicSchedule();
+
+  // API -> reservations (optional: you can remove this block لو مش عايز تعرض داتا الـ API)
+  const apiReservations = useMemo(() => {
+    const lessons = data?.group_lessons || [];
+    if (!Array.isArray(lessons)) return [];
+
+    return lessons
+      .map((l) => {
+        const time = timeHHMMSS_toSlot(l?.start_time);
+        if (!l?.session_date || !time) return null;
+
+        return {
+          id: String(l.schedule_id),
+          date: String(l.session_date),
+          time,
+          type: "session",
+          title: l?.course_name || "Session",
+          instructor: l?.group_name || "—",
+          room: "—",
+          students: 0,
+          maxStudents: 0,
+          status: l?.session_status || "confirmed",
+          image: l?.image,
+        };
+      })
+      .filter(Boolean);
+  }, [data?.group_lessons]);
+
+  const reservations = useMemo(
+    () => [...apiReservations, ...localReservations],
+    [apiReservations, localReservations]
+  );
+
+  // week dates built from API week_start (or fallback local)
+  const getWeekDates = (weekStartStr, weekOffset = 0) => {
+    const startStr = weekStartStr || getLocalWeekStartYMD(0);
+    const start = parseISODate(startStr);
+    if (!start) return [];
+
+    const startOfWeek = new Date(start);
+    startOfWeek.setDate(startOfWeek.getDate() + weekOffset * 7);
 
     const week = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(startOfWeek);
       date.setDate(startOfWeek.getDate() + i);
+
       week.push({
+        date: formatLocalYMD(date), // ✅ no UTC shift
         day: date.toLocaleDateString("en-US", { weekday: "long" }),
-        date: date.toISOString().split("T")[0],
         shortDay: date.toLocaleDateString("en-US", { weekday: "short" }),
         dayNumber: String(date.getDate()).padStart(2, "0"),
         monthNumber: String(date.getMonth() + 1).padStart(2, "0"),
@@ -158,37 +143,68 @@ export default function SchedulingPage() {
     return week;
   };
 
-  const weekDates = useMemo(() => getWeekDates(currentWeek), [currentWeek]);
+  const weekDates = useMemo(
+    () => getWeekDates(data?.week_start, currentWeek),
+    [data?.week_start, currentWeek]
+  );
 
   const getWeekRange = () => {
-    const firstDate = new Date(weekDates[0].date);
-    const lastDate = new Date(weekDates[6].date);
-    return `${firstDate.getDate()} ${firstDate.toLocaleDateString("en-US", { month: "short" })} ${firstDate.getFullYear()} - ${lastDate.getDate()} ${lastDate.toLocaleDateString("en-US", { month: "short" })} ${lastDate.getFullYear()}`;
+    const first =
+      parseISODate(data?.week_start) ||
+      (weekDates[0] ? parseISODate(weekDates[0].date) : null);
+    const last =
+      parseISODate(data?.week_end) ||
+      (weekDates[6] ? parseISODate(weekDates[6].date) : null);
+    if (!first || !last) return "";
+
+    return `${first.getDate()} ${first.toLocaleDateString("en-US", {
+      month: "short",
+    })} ${first.getFullYear()} - ${last.getDate()} ${last.toLocaleDateString(
+      "en-US",
+      { month: "short" }
+    )} ${last.getFullYear()}`;
   };
 
-  const getReservationForSlot = (day, time) => {
-    return reservations.find((r) => r.day === day && r.time === time);
+  const getReservationForSlot = (date, time) => {
+    return reservations.find((r) => r.date === date && r.time === time);
   };
 
-  const getReservationCount = (day) => {
-    return reservations.filter((r) => r.day === day).length;
+  const getReservationCount = (date) => {
+    return reservations.filter((r) => r.date === date).length;
   };
 
-  const handleSlotClick = (day, time, date) => {
-    const existing = getReservationForSlot(day, time);
-    if (!existing) {
-      setSelectedSlot({ day, time, date });
-      alert(`Create new session for ${day} at ${time}`);
-    }
+  const handleSlotClick = (dayInfo, time) => {
+    const existing = getReservationForSlot(dayInfo.date, time);
+    if (!existing) setCreatingSlot({ date: dayInfo.date, time });
   };
 
   const handleDeleteReservation = (id) => {
-    setReservations((prev) => prev.filter((r) => r.id !== id));
+    setLocalReservations((prev) => prev.filter((r) => r.id !== id));
     setActiveReservation(null);
   };
 
   const handleUpdateReservation = (id, updates) => {
-    setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+    setLocalReservations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...updates } : r))
+    );
+  };
+
+  const handleCreateReservation = (slot, payload) => {
+    setLocalReservations((prev) => {
+      const lastId = prev.length ? Number(prev[prev.length - 1].id) : 0;
+      const nextId = Number.isFinite(lastId) ? lastId + 1 : prev.length + 1;
+      return [
+        ...prev,
+        {
+          id: nextId,
+          date: slot.date,
+          time: slot.time,
+          type: "session",
+          status: "confirmed",
+          ...payload,
+        },
+      ];
+    });
   };
 
   const getSlotContent = (reservation) => {
@@ -204,11 +220,12 @@ export default function SchedulingPage() {
     }
 
     if (reservation.type === "session") {
-      const isFullyBooked = reservation.students >= reservation.maxStudents;
-      const ratio = Math.min(
-        100,
-        Math.round((reservation.students / reservation.maxStudents) * 100)
-      );
+      const max = reservation.maxStudents || 0;
+      const students = reservation.students || 0;
+      const isFullyBooked = max > 0 && students >= max;
+
+      const ratio = Math.min(100, Math.round((students / (max || 1)) * 100));
+
       return (
         <div
           className={`p-2 rounded-lg text-xs font-medium h-12 flex flex-col justify-center text-center leading-tight cursor-pointer transition-colors ${
@@ -216,16 +233,23 @@ export default function SchedulingPage() {
               ? "bg-red-500 text-white hover:bg-red-600"
               : "bg-orange-400 text-white hover:bg-orange-500"
           }`}
-          title={`${reservation.title} • ${reservation.students}/${reservation.maxStudents}`}
+          title={`${reservation.title} • ${students}/${max || "—"}`}
         >
           <div className="truncate font-semibold">{reservation.title}</div>
+
           <div className="flex items-center gap-2 justify-center">
             <div className="text-xs opacity-90 truncate">
-              {reservation.students}/{reservation.maxStudents} students
+              {max ? `${students}/${max} students` : "Session"}
             </div>
-            <div className="h-1.5 w-20 bg-white/40 rounded overflow-hidden">
-              <div className="h-full bg-white/90" style={{ width: `${ratio}%` }} />
-            </div>
+
+            {!!max && (
+              <div className="h-1.5 w-20 bg-white/40 rounded overflow-hidden">
+                <div
+                  className="h-full bg-white/90"
+                  style={{ width: `${ratio}%` }}
+                />
+              </div>
+            )}
           </div>
         </div>
       );
@@ -234,185 +258,131 @@ export default function SchedulingPage() {
     return null;
   };
 
-  const navigateWeek = (direction) => {
-    setCurrentWeek((prev) => prev + direction);
-  };
+  const todayStr = data?.today || formatLocalYMD(new Date());
 
   return (
     <div className="min-h-screen">
-      <div className="">
-        <BreadCrumb title={"Class Scheduling"} parent={"Home"} child={"Scheduling"} />
+      <BreadCrumb
+        title={"Class Scheduling"}
+        parent={"Home"}
+        child={"Scheduling"}
+      />
 
-        {/* Top Stats */}
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl p-4 shadow border border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <CalendarDays size={20} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {reservations.filter((r) => r.type === "session").length}
-                </p>
-                <p className="text-sm text-gray-600">Active Sessions</p>
-              </div>
+      {/* Top Stats */}
+      <div className="mt-6 md:max-w-full grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl p-4 shadow border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <CalendarDays size={20} className="text-blue-600" />
             </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow border border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Users size={20} className="text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {reservations
-                    .filter((r) => r.type === "session")
-                    .reduce((sum, r) => sum + r.students, 0)}
-                </p>
-                <p className="text-sm text-gray-600">Total Students</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow border border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                <Clock size={20} className="text-amber-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {reservations.filter((r) => r.type === "checkout").length}
-                </p>
-                <p className="text-sm text-gray-600">Maintenance Slots</p>
-              </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {reservations.filter((r) => r.type === "session").length}
+              </p>
+              <p className="text-sm text-gray-600">Active Sessions</p>
             </div>
           </div>
         </div>
 
-        {/* Header Controls */}
-        <div className="mt-8 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Navigation Controls */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setCurrentWeek(0)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
-              >
-                Today
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => navigateWeek(-1)}
-                  className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <button
-                  onClick={() => navigateWeek(1)}
-                  className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-
-              <div className="text-lg font-semibold text-gray-900">{getWeekRange()}</div>
+        <div className="bg-white rounded-xl p-4 shadow border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <Users size={20} className="text-green-600" />
             </div>
-
-            {/* View Controls + Search (optional) */}
-            <div className="flex items-center gap-3">
-              <div className="flex bg-white border border-gray-200 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode("month")}
-                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                    viewMode === "month"
-                      ? "bg-indigo-100 text-indigo-700"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  Month
-                </button>
-                <button
-                  onClick={() => setViewMode("week")}
-                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                    viewMode === "week"
-                      ? "bg-indigo-100 text-indigo-700"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  Week
-                </button>
-                <button
-                  onClick={() => setViewMode("day")}
-                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                    viewMode === "day"
-                      ? "bg-indigo-100 text-indigo-700"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  Day
-                </button>
-              </div>
-
-              {/* Example search input (not wired) */}
-              <div className="relative hidden sm:block">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  placeholder="Search (todo)"
-                  className="pl-9 pr-3 py-2 rounded-lg border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 text-sm"
-                />
-              </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {reservations
+                  .filter((r) => r.type === "session")
+                  .reduce((sum, r) => sum + (r.students || 0), 0)}
+              </p>
+              <p className="text-sm text-gray-600">Total Students</p>
             </div>
           </div>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="!max-w-3xl overflow-x-auto md:!max-w-full rounded-2xl shadow-lg border border-gray-100 md:overflow-hidden">
+        <div className="bg-white rounded-xl p-4 shadow border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+              <Clock size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {reservations.filter((r) => r.type === "checkout").length}
+              </p>
+              <p className="text-sm text-gray-600">Maintenance Slots</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Header Controls */}
+      <div className="mt-8 mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="text-lg font-semibold text-gray-900">
+              {getWeekRange()}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Calendar Grid (mobile horizontal scroll) */}
+      <div className="w-full rounded-2xl shadow-lg border border-gray-100 overflow-x-auto md:overflow-x-visible [-webkit-overflow-scrolling:touch]">
+        {/* w-max + min-w-full + padding right -> last cell never clipped */}
+        <div className="w-max min-w-full pr-4 md:pr-0">
           {/* Header Row */}
-          <div className="grid grid-cols-8 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+          <div className="grid grid-cols-[90px_repeat(7,140px)] bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
             <div className="font-semibold p-1 flex justify-center items-center text-gray-700 border-r border-gray-200 bg-gray-100">
               Time
             </div>
-            {weekDates.map((dayInfo, index) => (
-              <div
-                key={dayInfo.date}
-                className={`text-center p-1 flex flex-col justify-center items-center border-r border-gray-200 last:border-r-0 ${
-                  index === new Date().getDay() ? "bg-indigo-50" : ""
-                }`}
-              >
-                <div className="font-semibold text-gray-900">
-                  {dayInfo.shortDay} {dayInfo.dayNumber}/{dayInfo.monthNumber}
+
+            {weekDates.map((dayInfo) => {
+              const isTodayHeader = dayInfo.date === todayStr;
+              return (
+                <div
+                  key={dayInfo.date}
+                  className={`text-center p-1 flex flex-col justify-center items-center border-r border-gray-200 last:border-r-0 ${
+                    isTodayHeader ? "bg-indigo-50" : ""
+                  }`}
+                >
+                  <div className="font-semibold text-gray-900">
+                    {dayInfo.shortDay} {dayInfo.dayNumber}/{dayInfo.monthNumber}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {getReservationCount(dayInfo.date)} Reservation
+                    {getReservationCount(dayInfo.date) !== 1 ? "s" : ""}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {getReservationCount(dayInfo.day)} Reservation
-                  {getReservationCount(dayInfo.day) !== 1 ? "s" : ""}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Time Slots Grid */}
           <div className="divide-y divide-gray-100">
             {timeSlots.map((time) => (
-              <div key={time} className="grid grid-cols-8 min-h-[60px]">
+              <div
+                key={time}
+                className="grid grid-cols-[90px_repeat(7,140px)] min-h-[60px]"
+              >
                 {/* Time Column */}
                 <div className="p-4 bg-gray-50 justify-center border-r border-gray-200 flex items-center">
-                  <div className="text-sm font-medium text-gray-700">{time}</div>
+                  <div className="text-sm font-medium text-gray-700">
+                    {time}
+                  </div>
                 </div>
 
                 {/* Day Columns */}
                 {weekDates.map((dayInfo) => {
-                  const reservation = getReservationForSlot(dayInfo.day, time);
-                  const isToday = dayInfo.date === new Date().toISOString().split("T")[0];
+                  const reservation = getReservationForSlot(dayInfo.date, time);
+                  const isToday = dayInfo.date === todayStr;
 
                   return (
                     <div
-                      key={`${dayInfo.day}-${time}`}
+                      key={`${dayInfo.date}-${time}`}
                       className={`p-2 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors cursor-pointer ${
-                        isToday ? "bg-indigo-25" : ""
+                        isToday ? "bg-indigo-50/30" : ""
                       }`}
-                      onClick={() => handleSlotClick(dayInfo.day, time, dayInfo.date)}
+                      onClick={() => handleSlotClick(dayInfo, time)}
                     >
                       {reservation ? (
                         <button
@@ -426,10 +396,11 @@ export default function SchedulingPage() {
                           {getSlotContent(reservation)}
                         </button>
                       ) : (
-                        null
-                        // <div className="h-12 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                        //   <Plus size={16} className="text-gray-400" />
-                        // </div>
+                        <div className="h-12 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                          <span className="text-xs text-gray-400">
+                            + Add Session
+                          </span>
+                        </div>
                       )}
                     </div>
                   );
@@ -438,43 +409,59 @@ export default function SchedulingPage() {
             ))}
           </div>
         </div>
+      </div>
 
-        {/* Legend */}
-        <div className="mt-6 bg-white rounded-xl p-4 shadow border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Legend</h3>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-orange-400 rounded"></div>
-              <span className="text-sm text-gray-600">Available Session</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-500 rounded"></div>
-              <span className="text-sm text-gray-600">Full Session</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-slate-500 rounded"></div>
-              <span className="text-sm text-gray-600">Maintenance/Check Out</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-dashed border-gray-300 rounded"></div>
-              <span className="text-sm text-gray-600">Available Time Slot</span>
-            </div>
+      {/* Legend */}
+      <div className="mt-6 bg-white rounded-xl p-4 shadow border border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Legend</h3>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-orange-400 rounded" />
+            <span className="text-sm text-gray-600">Available Session</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-red-500 rounded" />
+            <span className="text-sm text-gray-600">Full Session</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-slate-500 rounded" />
+            <span className="text-sm text-gray-600">Maintenance/Check Out</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-dashed border-gray-300 rounded" />
+            <span className="text-sm text-gray-600">Available Time Slot</span>
           </div>
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* View Reservation Modal */}
       {activeReservation && (
         <ReservationModal
           reservation={activeReservation}
           onClose={() => setActiveReservation(null)}
           onDelete={() => handleDeleteReservation(activeReservation.id)}
-          onUpdate={(updates) => handleUpdateReservation(activeReservation.id, updates)}
+          onUpdate={(updates) =>
+            handleUpdateReservation(activeReservation.id, updates)
+          }
+        />
+      )}
+
+      {/* Create Session Modal */}
+      {creatingSlot && (
+        <CreateSessionModal
+          slot={creatingSlot}
+          onClose={() => setCreatingSlot(null)}
+          onCreate={(payload) => {
+            handleCreateReservation(creatingSlot, payload);
+            setCreatingSlot(null);
+          }}
         />
       )}
     </div>
   );
 }
+
+/* -------------------- Modals -------------------- */
 
 function ReservationModal({ reservation, onClose, onDelete, onUpdate }) {
   useEffect(() => {
@@ -484,18 +471,25 @@ function ReservationModal({ reservation, onClose, onDelete, onUpdate }) {
   }, [onClose]);
 
   const isSession = reservation.type === "session";
-  const isFull = isSession && reservation.students >= (reservation.maxStudents || 0);
+  const isFull =
+    isSession && reservation.students >= (reservation.maxStudents || 0);
 
   const capacityPct = isSession
-    ? Math.min(100, Math.round((reservation.students / (reservation.maxStudents || 1)) * 100))
+    ? Math.min(
+        100,
+        Math.round(
+          (reservation.students / (reservation.maxStudents || 1)) * 100
+        )
+      )
     : 0;
 
   return (
     <div className="fixed inset-0 z-50">
-      {/* backdrop */}
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
-
-      {/* modal */}
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+        aria-hidden="true"
+      />
       <div
         role="dialog"
         aria-modal="true"
@@ -503,10 +497,12 @@ function ReservationModal({ reservation, onClose, onDelete, onUpdate }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100">
-          {/* header */}
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-lg font-semibold text-gray-900">
-              {reservation.title || (reservation.type === "checkout" ? "Maintenance / Check Out" : "Reservation")}
+              {reservation.title ||
+                (reservation.type === "checkout"
+                  ? "Maintenance / Check Out"
+                  : "Reservation")}
             </h3>
             <button
               onClick={onClose}
@@ -517,23 +513,31 @@ function ReservationModal({ reservation, onClose, onDelete, onUpdate }) {
             </button>
           </div>
 
-          {/* body */}
           <div className="p-4 space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-3">
               <Info label="Date" value={reservation.date} />
               <Info label="Time" value={reservation.time} />
-              {reservation.room && <Info label="Room" value={reservation.room} />}
-              {reservation.instructor && <Info label="Instructor" value={reservation.instructor} />}
+              {reservation.room && (
+                <Info label="Room" value={reservation.room} />
+              )}
+              {reservation.instructor && (
+                <Info label="Instructor" value={reservation.instructor} />
+              )}
               <Info label="Type" value={reservation.type} />
               <Info label="Status" value={reservation.status || "—"} />
               {isSession && (
                 <>
-                  <Info label="Students" value={`${reservation.students}/${reservation.maxStudents}`} />
+                  <Info
+                    label="Students"
+                    value={`${reservation.students}/${reservation.maxStudents}`}
+                  />
                   <div>
                     <div className="text-gray-500">Capacity</div>
                     <div className="mt-0.5 w-full h-2 bg-gray-200 rounded">
                       <div
-                        className={`h-2 rounded ${isFull ? "bg-red-500" : "bg-orange-400"}`}
+                        className={`h-2 rounded ${
+                          isFull ? "bg-red-500" : "bg-orange-400"
+                        }`}
                         style={{ width: `${capacityPct}%` }}
                       />
                     </div>
@@ -541,21 +545,8 @@ function ReservationModal({ reservation, onClose, onDelete, onUpdate }) {
                 </>
               )}
             </div>
-
-            {/* {isSession && (
-              <div className="mt-2 flex items-center gap-2">
-               
-                <button
-                  onClick={() => onUpdate({ status: isFull ? "confirmed" : "full" })}
-                  className="ml-auto px-3 py-2 rounded-lg border text-sm hover:bg-gray-50"
-                >
-                  {isFull ? "Mark Not Full" : "Mark Full"}
-                </button>
-              </div>
-            )} */}
           </div>
 
-          {/* footer */}
           <div className="p-4 border-t flex items-center justify-between">
             <button
               onClick={onDelete}
@@ -564,10 +555,12 @@ function ReservationModal({ reservation, onClose, onDelete, onUpdate }) {
               Delete
             </button>
             <div className="flex items-center gap-2">
-              <button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm hover:bg-gray-50">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg border text-sm hover:bg-gray-50"
+              >
                 Close
               </button>
-             
             </div>
           </div>
         </div>
@@ -576,12 +569,156 @@ function ReservationModal({ reservation, onClose, onDelete, onUpdate }) {
   );
 }
 
-function Info({ label, value }) {
+function CreateSessionModal({ slot, onClose, onCreate }) {
+  const [title, setTitle] = useState("");
+  const [instructor, setInstructor] = useState("");
+  const [room, setRoom] = useState("");
+  const [maxStudents, setMaxStudents] = useState(12);
+  const [students, setStudents] = useState(0);
+
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    onCreate({
+      title: title.trim(),
+      instructor: instructor.trim() || "—",
+      room: room.trim() || "—",
+      students: Number(students) || 0,
+      maxStudents: Number(maxStudents) || 1,
+    });
+  };
+
   return (
-    <div>
-      <div className="text-gray-500">{label}</div>
-      <div className="mt-0.5 text-gray-900 font-medium">{value}</div>
+    <div className="fixed inset-0 z-50">
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="absolute inset-0 flex items-center justify-center p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100"
+        >
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Create New Session
+            </h3>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="p-4 space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <Info label="Date" value={slot.date} />
+              <Info label="Time" value={slot.time} />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-gray-600 text-sm">
+                Session Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                placeholder="e.g. English Conversation"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-gray-600 text-sm">Instructor</label>
+              <input
+                value={instructor}
+                onChange={(e) => setInstructor(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                placeholder="e.g. Ms. Sarah Johnson"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-gray-600 text-sm">Room</label>
+              <input
+                value={room}
+                onChange={(e) => setRoom(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                placeholder="e.g. Room A1"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="block text-gray-600 text-sm">
+                  Max Students
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={maxStudents}
+                  onChange={(e) => setMaxStudents(Number(e.target.value))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-gray-600 text-sm">
+                  Current Students
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={students}
+                  onChange={(e) => setStudents(Number(e.target.value))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 border-t flex items-center justify-between">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border text-sm hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700"
+            >
+              Create Session
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
 
+function Info({ label, value }) {
+  return (
+    <div>
+      <div className="text-gray-500 text-xs">{label}</div>
+      <div className="mt-0.5 text-gray-900 font-medium text-sm">{value}</div>
+    </div>
+  );
+}

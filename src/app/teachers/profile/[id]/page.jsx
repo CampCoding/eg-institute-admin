@@ -2,38 +2,50 @@
 "use client";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import React from "react";
+import useGetTeacherById from "../../../../utils/Api/Teachers/GetTeacherById";
+import { useDispatch, useSelector } from "react-redux";
+import { setTeacher } from "../../../../utils/Store/TeacherSlice";
+import { time } from "framer-motion";
 
 export default function InstructorProfile({ instructor }) {
   const router = useRouter();
+  const { id } = useParams();
+  const dispatch = useDispatch();
+  const { data: teacher } = useGetTeacherById({ id });
+  console.log(teacher);
+
   const data = instructor || {
-    id: 12,
-    name: "Ms. Sara Al-Masri",
+    id: teacher?.message?.teacher_id,
+    name: teacher?.message?.teacher_name,
+    email: teacher?.message?.teacher_email,
+    phone: teacher?.message?.phone,
+    hourlyRate: teacher?.message?.hourly_rate,
+    specialties: teacher?.message.specialization,
+    bio: teacher?.message?.bio,
+    tags: teacher?.message?.tags,
+    level: teacher?.message?.level,
+    timezone: teacher?.message?.timezone,
+    country: teacher?.message?.country,
     avatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=512&auto=format&fit=crop",
-    email: "sara.almasri@academy.com",
-    phone: "+20 100 234 5678",
+      teacher?.message?.teacher_image ||
+      "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=1400&auto=format&fit=crop",
     status: "Active",
     role: "Arabic Instructor",
-    experienceYears: 7,
-    specialties: ["MSA (الفصحى)", "Conversation", "Grammar", "Tajwīd basics"],
-    langs: ["Arabic (Native)", "English (C1)", "French (B1)"],
-    hourlyRate: 25,
-    bio: "Dedicated Arabic educator focusing on communicative approaches for non-native learners. Passionate about pronunciation, rhythm, and confidence-building.",
-    rating: 4.8,
+
+    langs: teacher?.message?.languages || [
+      "Arabic (Native)",
+      "English (C1)",
+      "French (B1)",
+    ],
+    rating: teacher?.message?.rate,
     satisfaction: 96,
-    studentsCount: 124,
-    classesCount: 18,
+    studentsCount: teacher?.message?.student_count,
+    classesCount: teacher?.message?.class_count,
     lessonsTaught: 1420,
     attendance: 98,
-    availability: [
-      { day: "Mon", slots: ["10:00–12:00", "15:00–17:00"] },
-      { day: "Tue", slots: ["11:00–14:00"] },
-      { day: "Wed", slots: ["09:00–12:00"] },
-      { day: "Thu", slots: ["13:00–16:00"] },
-      { day: "Fri", slots: ["Off"] },
-    ],
+    availability: teacher?.message?.teacher_slots || [],
     courses: [
       {
         id: "A101",
@@ -65,9 +77,83 @@ export default function InstructorProfile({ instructor }) {
       { name: "Aisha", rating: 5, text: "Great pronunciation drills!" },
       { name: "Leo", rating: 4, text: "Engaging and structured lessons." },
     ],
-    notes:
-      "Excellent learner feedback; consider adding weekly writing prompts to B1 class.",
   };
+  console.log(data);
+
+  // Helpers
+  const capitalize = (s) =>
+    typeof s === "string" && s.length
+      ? s.charAt(0).toUpperCase() + s.slice(1)
+      : "";
+
+  // ✅ teacher: هو الريسبونس (أو teacher?.message حسب انت بتجيبها ازاي)
+  const teacherFromApiToForm = {
+    name: data?.name ?? "",
+
+    // زي التاني: prefer teacher_email ثم email
+    email: data?.teacher_email || data?.email || "",
+
+    phone: data?.phone ?? "",
+
+    // زي التاني: title = specialization (ولو عندك specialties array خليه fallback)
+    title: data?.specialties ?? "",
+
+    // زي التاني: summary = summary أو bio
+    summary: data?.summary ?? data?.bio ?? "",
+
+    // زي التاني: photo
+    photo: data?.teacher_image ?? data?.avatar ?? DEFAULT_PHOTO,
+
+    country: data?.country ?? "",
+
+    // زي التاني
+    TimeZone:
+      data?.time_zone && data.time_zone.trim()
+        ? data.time_zone
+        : "Africa/Cairo",
+
+    // زي التاني: hourly_rate
+    hourly_rate: data?.hourly_rate ?? data?.hourlyRate ?? "",
+
+    // زي التاني: level (ولو جاي lower-case حوّله)
+    level: data?.level ? capitalize(data.level) : "Expert",
+
+    // زي التاني: tags => array
+    tags:
+      typeof data?.tags === "string"
+        ? data.tags
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : Array.isArray(data?.tags)
+        ? data.tags
+        : [],
+
+    // زي التاني: Languages (ولو عندك langs fallback)
+    Languages: Array.isArray(data?.languages)
+      ? data.languages
+      : Array.isArray(data?.langs)
+      ? data.langs
+      : [],
+
+    // ✅ زي التاني بالظبط: teacher_slots (مش availability)
+    // وخليه يرجع "HH:mm:ss" زي ما التاني عامل
+    teacher_slots: Array.isArray(data?.teacher_slots)
+      ? data.teacher_slots.map((s) => ({
+          day: s?.day ?? "Monday",
+          slots_from: s?.slots_from ?? "",
+          slots_to: s?.slots_to ?? "",
+        }))
+      : Array.isArray(data?.availability)
+      ? data.availability.map((s) => ({
+          day: s?.day ?? "Monday",
+          slots_from: s?.slots_from ?? "",
+          slots_to: s?.slots_to ?? "",
+        }))
+      : [],
+  };
+
+  console.log(teacherFromApiToForm);
 
   const Pill = ({ children, tone = "default" }) => {
     const tones = {
@@ -132,15 +218,9 @@ export default function InstructorProfile({ instructor }) {
                 <Pill tone="success">{data.status}</Pill>
                 <Pill>ID: {data.id}</Pill>
               </div>
-              <p className="text-gray-500 mt-1">
-                {data.role} • {data.experienceYears} yrs exp
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {data.specialties.map((t) => (
-                  <Pill key={t} tone="info">
-                    {t}
-                  </Pill>
-                ))}
+              <p className="text-gray-500 mt-1">{data.role} •</p>
+              <div className="flex flex-wrap justify-start items-center gap-2 mt-3">
+                level:<Pill tone="info">{data.level}</Pill>
               </div>
             </div>
 
@@ -153,7 +233,10 @@ export default function InstructorProfile({ instructor }) {
                 Schedule
               </button>
               <button
-                onClick={() => router.push(`/teachers/edit/${data?.id}`)}
+                onClick={() => {
+                  dispatch(setTeacher(teacherFromApiToForm));
+                  router.push(`/teachers/edit/${data?.id}`);
+                }}
                 className="px-4 py-2 rounded-xl text-white"
                 style={{ backgroundColor: "#02AAA0" }}
               >
@@ -237,12 +320,6 @@ export default function InstructorProfile({ instructor }) {
                 About
               </h2>
               <p className="text-gray-700 leading-relaxed">{data.bio}</p>
-              <div className="mt-5">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">
-                  Internal Notes
-                </h3>
-                <p className="text-gray-600">{data.notes}</p>
-              </div>
             </div>
 
             {/* Reviews */}
@@ -311,21 +388,21 @@ export default function InstructorProfile({ instructor }) {
                 Weekly Availability
               </h2>
               <div className="space-y-3">
-                {data.availability.map((a) => (
-                  <div key={a.day} className="flex items-start justify-between">
-                    <span className="text-gray-600 w-16">{a.day}</span>
-                    <div className="flex-1 flex flex-wrap gap-2">
-                      {a.slots.map((s, i) => (
-                        <span
-                          key={i}
-                          className="px-2.5 py-1 rounded-lg text-xs border bg-gray-50 text-gray-700"
-                        >
-                          {s}
-                        </span>
-                      ))}
+                {data?.availability?.map((a) => {
+                  const slot = `${a.slots_from} - ${a.slots_to}`;
+
+                  return (
+                    <div
+                      key={a.day}
+                      className="flex items-start justify-between"
+                    >
+                      <span className="text-gray-600 w-16">{a.day}</span>
+                      <div className="flex-1 flex flex-wrap gap-2">
+                        <Pill>{slot}</Pill>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

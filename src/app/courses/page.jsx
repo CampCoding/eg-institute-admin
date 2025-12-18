@@ -1,39 +1,90 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import { courses as seedCourses } from "@/utils/data";
+
 import { useRouter } from "next/navigation";
-import { Trash, Pencil } from "lucide-react";
-import DeleteModal from "@/components/DeleteModal/DeleteModal";
+import { Trash, Pencil, EyeOff, Eye, Info } from "lucide-react";
+import axios from "axios";
+import { BASE_URL } from "@/utils/base_url";
+import { Modal, Spin } from "antd";
+import toast from "react-hot-toast";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
+import { useGetAllCourses } from "../../utils/Api/Courses/GetAllCourses";
+import { Toggle } from "../../utils/Api/Toggle";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function CoursesPage() {
   const router = useRouter();
+  const [allCoursesLoading, setAllCoursesLoading] = useState(false);
+  const [allCoursesData, setAllCoursesData] = useState([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const queryClient = useQueryClient();
+  // Start from provided dataset (not actually used after fetch)
 
-  // Start from provided dataset (no localStorage merge)
-  const [data, setData] = useState(seedCourses);
   const [searchTerm, setSearchTerm] = useState("");
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const { isLoading, data } = useGetAllCourses();
+  console.log(data);
 
   const filtered = useMemo(() => {
     const q = (searchTerm || "").trim().toLowerCase();
-    if (!q) return data;
-    return data.filter(
+    if (!q) return data?.message;
+    return data?.message?.filter(
       (c) =>
-        c?.title?.toLowerCase().includes(q) ||
-        c?.description?.toLowerCase().includes(q) ||
-        c?.teacher?.toLowerCase().includes(q) ||
+        c?.course_name?.toLowerCase().includes(q) ||
+        c?.course_descreption?.toLowerCase().includes(q) ||
         c?.level?.toLowerCase().includes(q)
     );
-  }, [data, searchTerm]);
+  }, [data?.message, searchTerm]);
 
-  function handleDelete() {
-    if (!selectedCourse) return;
-    setData((prev) => prev.filter((c) => String(c.id) !== String(selectedCourse.id)));
-    setOpenDeleteModal(false);
-    setSelectedCourse(null);
+  const handleDelete = async () => {
+    const token = localStorage.getItem("AccessToken");
+    setDeleteLoading(true);
+
+    if (!selectedCourse) {
+      setDeleteLoading(false);
+      return;
+    }
+
+    const data_send = {
+      course_id: selectedCourse?.course_id,
+    };
+
+    try {
+      const res = await Toggle({
+        payload: data_send,
+        url: "courses/toggle_course.php",
+        queryClient,
+        key: "courses",
+      });
+      if (res.status === "success") {
+        toast.success(res.message);
+      } else {
+        toast.error(res.message);
+      }
+      setDeleteLoading(false);
+      setOpenDeleteModal(false);
+    } catch (error) {}
+  };
+
+  if (allCoursesLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Spin size="large" spinning />
+      </div>
+    );
   }
+
+  // Helper: check if course is hidden ("1" or 1)
+  const isSelectedHidden =
+    selectedCourse &&
+    (selectedCourse.hidden === "1" ||
+      selectedCourse.hidden === 1 ||
+      selectedCourse.hidden === true);
 
   return (
     <div className="min-h-screen">
@@ -59,9 +110,9 @@ export default function CoursesPage() {
 
       {/* Grid */}
       <div className="grid mt-5 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((c) => (
+        {filtered?.map((c) => (
           <article
-            key={c.id}
+            key={c.course_id ?? c.id}
             className="group relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
           >
             {/* Soft blob accent */}
@@ -72,8 +123,8 @@ export default function CoursesPage() {
             <div className="relative h-44 overflow-hidden">
               {c.video ? (
                 <video
-                  src={c.video}
-                  poster={c.poster}
+                  src={c?.video}
+                  poster={c?.image}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   autoPlay
                   muted
@@ -84,30 +135,34 @@ export default function CoursesPage() {
               ) : (
                 <img
                   src={
-                    c.poster ||
+                    c?.image ||
                     "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1400&auto=format&fit=crop"
                   }
-                  alt={c.title}
+                  alt={c?.course_name}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   loading="lazy"
                 />
               )}
-              <div className={`absolute inset-0 bg-gradient-to-r ${c.color} opacity-25`} />
 
               {/* Badges */}
               <div className="absolute top-3 left-3 flex gap-2">
                 <span className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200">
-                  {c.level}
+                  {c?.level}
                 </span>
                 <span className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200">
-                  {c.duration}
+                  {c?.Duration}
                 </span>
-                {Array.isArray(c.units) && c.units.length > 0 && (
+                {Array.isArray(c?.lessons) && c?.lessons?.length > 0 && (
                   <span
                     className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200"
-                    title={`${c.units.length} units`}
+                    title={`${c?.lessons?.length} units`}
                   >
-                    {c.units.length} units
+                    {c?.lessons?.length} units
+                  </span>
+                )}
+                {(c?.hidden === "1" || c?.hidden === 1) && (
+                  <span className="text-[11px] rounded-full bg-red-100 text-red-700 px-2 py-1 ring-1 ring-red-200">
+                    Hidden
                   </span>
                 )}
               </div>
@@ -116,52 +171,57 @@ export default function CoursesPage() {
             {/* Body */}
             <div className="p-4">
               <h2 className="text-base sm:text-lg font-semibold tracking-tight line-clamp-1">
-                {c.title}
+                {c?.course_name}
               </h2>
-              <p className="mt-1 text-slate-600 text-sm line-clamp-2">{c.description}</p>
+              <p className="mt-1 text-slate-600 text-sm line-clamp-2">
+                {c?.course_descreption}
+              </p>
 
               <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
                 <div className="flex items-center gap-3">
-                  <span title="Lessons" className="inline-flex items-center gap-1">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4">
-                      <path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" />
-                    </svg>
-                    {c.lessons} lessons
-                  </span>
-                  <span className="inline-flex items-center gap-1">
+                  <span
+                    title="Lessons"
+                    className="inline-flex items-center gap-1"
+                  >
                     <svg viewBox="0 0 24 24" className="h-4 w-4">
                       <path
                         fill="currentColor"
-                        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z"
+                        d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"
                       />
                     </svg>
-                    {c.teacher}
+                    {c?.lessons} lessons
                   </span>
                 </div>
-                <span className="font-semibold text-[var(--text-color)]">{c.price}</span>
+                <span className="font-semibold text-[var(--text-color)]">
+                  {c?.price}
+                </span>
               </div>
 
               {/* Actions */}
               <div className="mt-3 flex items-center gap-2">
                 <button
-                  onClick={() => router.push(`/courses/details/${c.id}`)}
-                  className="flex-1 rounded-xl bg-[var(--primary-color)] text-white py-2 text-sm font-medium hover:opacity-90"
+                  onClick={() =>
+                    router.push(`/courses/units/${c.course_id ?? c.id}`)
+                  }
+                  className="flex-1 rounded-xl bg-[var(--primary-color)] !text-white py-2 text-sm font-medium hover:opacity-90"
                 >
-                  Details
+                  Units
                 </button>
-
-                {/* {Array.isArray(c.units) && c.units.length > 0 && (
-                  <button
-                    onClick={() => router.push(`/courses/units/${c.id}`)}
-                    className="flex-1 rounded-xl border border-slate-200 py-2 text-sm font-medium hover:bg-slate-50"
-                  >
-                    Units
-                  </button>
-                )} */}
 
                 {/* Edit icon */}
                 <button
-                  onClick={() => router.push(`/courses/edit/${c.id}`)}
+                  title="Details"
+                  className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
+                  onClick={() =>
+                    router.push(`/courses/details/${c.course_id ?? c.id}`)
+                  }
+                >
+                  <Info size={18} />
+                </button>
+                <button
+                  onClick={() =>
+                    router.push(`/courses/edit/${c?.course_id ?? c.id}`)
+                  }
                   className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
                   aria-label="Edit course"
                   title="Edit"
@@ -169,17 +229,21 @@ export default function CoursesPage() {
                   <Pencil size={18} />
                 </button>
 
-                {/* Delete icon */}
+                {/* Delete / Toggle status icon */}
                 <button
                   onClick={() => {
                     setSelectedCourse(c);
                     setOpenDeleteModal(true);
                   }}
                   className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
-                  aria-label="Delete course"
-                  title="Delete"
+                  aria-label="Toggle course status"
+                  title={
+                    c?.hidden === "1" || c?.hidden === 1
+                      ? "Show course"
+                      : "Hide course"
+                  }
                 >
-                  <Trash size={18} />
+                  {c?.hidden ? <Eye size={18} /> : <EyeOff size={18} />}
                 </button>
               </div>
             </div>
@@ -190,17 +254,81 @@ export default function CoursesPage() {
         ))}
       </div>
 
-      <DeleteModal
-        handleSubmit={handleDelete}
-        title="Delete this course"
-        description={
-          selectedCourse
-            ? `Do you want to delete "${selectedCourse.title}"?`
-            : "Delete this course?"
-        }
+      {/* Status Modal (Hide / Show) */}
+      <Modal
         open={openDeleteModal}
-        setOpen={setOpenDeleteModal}
-      />
+        onCancel={() => {
+          if (!deleteLoading) {
+            setOpenDeleteModal(false);
+            setSelectedCourse(null);
+          }
+        }}
+        footer={null}
+        centered
+        closable={!deleteLoading}
+      >
+        <Box
+          sx={{
+            width: "100%",
+          }}
+          className="rounded-md shadow-lg max-w-full p-4 mx-auto bg-white"
+        >
+          <Typography
+            id="modal-modal-title"
+            variant="h6"
+            component="h2"
+            className="text-lg font-semibold text-center text-gray-800"
+          >
+            {isSelectedHidden ? "Show this course" : "Hide this course"}
+          </Typography>
+          <Typography
+            id="modal-modal-description"
+            sx={{ mt: 2 }}
+            className="text-sm text-center font-bold text-gray-600"
+          >
+            Do you want to {isSelectedHidden ? "show" : "hide"} this course?
+          </Typography>
+          <div className="flex justify-center gap-4 mt-4">
+            <Button
+              onClick={handleDelete}
+              variant="contained"
+              disabled={deleteLoading}
+              sx={{
+                bgcolor: "#dc2626",
+                color: "white",
+                "&:hover": { bgcolor: "#b91c1c" },
+              }}
+            >
+              {deleteLoading
+                ? "Loading..."
+                : isSelectedHidden
+                ? "Show"
+                : "Hide"}
+            </Button>
+
+            <Button
+              onClick={() => {
+                if (!deleteLoading) {
+                  setOpenDeleteModal(false);
+                  setSelectedCourse(null);
+                }
+              }}
+              variant="outlined"
+              sx={{
+                borderColor: "#ef4444",
+                color: "#dc2626",
+                "&:hover": {
+                  bgcolor: "#ef4444",
+                  color: "white",
+                  borderColor: "#ef4444",
+                },
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </Box>
+      </Modal>
     </div>
   );
 }

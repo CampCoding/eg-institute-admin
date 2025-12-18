@@ -8,20 +8,26 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
-  Lock,
   Play,
   Search,
   Clock3,
   ListChecks,
   ArrowLeft,
-  CirclePlus,
   Plus,
   Pencil,
   Eye,
   Trash,
+  Loader2,
+  EyeOff, // 👈 for status icon
 } from "lucide-react";
 import { Tooltip } from "antd";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
+import axios from "axios";
+import { BASE_URL } from "../../../../utils/base_url";
+import toast from "react-hot-toast";
+import Link from "next/link";
+import { useDispatch } from "react-redux";
+import { setUnit } from "../../../../utils/Store/UnitsSlice";
 
 /** Utility: format total minutes like 125 -> "2h 5m" */
 const fmtMinutes = (mins = 0) => {
@@ -39,22 +45,81 @@ export default function courseUnitsPage() {
     () => (Array.isArray(params?.unitId) ? params.unitId[0] : params?.unitId),
     [params]
   );
-  const [rowData , setRowData] = useState({});
+
+  const [rowData, setRowData] = useState({});
   const [course, setcourse] = useState(null);
-  const [expanded, setExpanded] = useState({}); // unitId -> boolean
-  const [completed, setCompleted] = useState({}); // lessonId -> boolean
+  const [expanded, setExpanded] = useState({});
+  const [completed, setCompleted] = useState({});
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [openDeleteModal , setOpenDeleteModal] = useState(false);
-  // Load course? once id changes
+  const [loading, setLoading] = useState(true); // main loading flag
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
+  const [allUnits, setAllUnits] = useState([]);
+  const [allCourses, setAllCourses] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState({});
+  const dispatch = useDispatch();
+
+  // 👇 status modal state
+  const [openStatusModal, setOpenStatusModal] = useState(null); // holds unit object or null
+  const [openStatusLoading, setOpenStatusLoading] = useState(false);
+
+  // Fetch selected course info
   useEffect(() => {
+    if (!id) return;
+    const token = localStorage.getItem("AccessToken");
+
+    setLoading(true);
+    axios
+      .get(BASE_URL + "/courses/select_courses.php", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => {
+        if (res?.data?.status === "success") {
+          const filtered = res?.data?.message?.find(
+            (item) => String(item?.course_id) === String(id)
+          );
+          setSelectedCourse(filtered || {});
+        }
+      })
+      .catch((e) => console.log(e))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  // Fetch units of this course
+  useEffect(() => {
+    if (!id) return;
+    const token = localStorage.getItem("AccessToken");
+    const data_send = {
+      course_id: id,
+    };
+
+    setLoading(true);
+    axios
+      .post(BASE_URL + "/units/select_course_units.php", data_send, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => {
+        if (res?.data?.status === "success") {
+          setAllUnits(res?.data?.message || []);
+        }
+      })
+      .catch((e) => console.log(e))
+      .finally(() => setLoading(false));
+  }, [id]);
+  console.log(setAllUnits);
+
+  // Local demo course meta (progress calculation etc.)
+  useEffect(() => {
+    if (!id) return;
     setLoading(true);
     const found = courses?.find((c) => String(c?.id) === String(id)) ?? null;
 
     setcourse(found);
     setLoading(false);
 
-    // expand first unit by default
     if (found?.units?.[0]?.unitId) {
       setExpanded({ [found.units[0].unitId]: true });
     }
@@ -74,22 +139,17 @@ export default function courseUnitsPage() {
     );
   }, [course]);
 
-  // Filter by search across lessons titles
   const filteredUnits = useMemo(() => {
-    if (!course?.units) return [];
+    if (!allUnits) return [];
     const q = search.trim().toLowerCase();
-    if (!q) return course?.units;
-    return course?.units
-      .map((unit) => ({
-        ...unit,
-        videos: unit.videos?.filter((video, i) =>
-          video.toLowerCase().includes(q)
-        ),
-      }))
-      .filter((unit) => unit.videos?.length);
-  }, [course, search]);
+    if (!q) return allUnits;
 
-  // Progress
+    // add real filtering later if you want
+    return allUnits.map((unit) => ({
+      ...unit,
+    }));
+  }, [allUnits, search]);
+
   const totalLessons = flatLessons.length || 0;
   const completedCount = useMemo(
     () => Object.values(completed).filter(Boolean).length,
@@ -98,17 +158,77 @@ export default function courseUnitsPage() {
   const progress =
     totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
-  // Expand/collapse units
   const toggleUnit = (unitId) =>
     setExpanded((s) => ({ ...s, [unitId]: !s[unitId] }));
 
-  // Mark lesson complete/incomplete
   const toggleComplete = (lessonId) =>
     setCompleted((s) => ({ ...s, [lessonId]: !s[lessonId] }));
 
   function handleSubmit() {
-    console.log("Delete")
+    console.log("Delete");
   }
+
+  // 👇 STATUS CHANGE HANDLER (with refetch)
+  async function handleChangeStatus() {
+    if (!openStatusModal?.unit_id) return;
+
+    try {
+      setOpenStatusLoading(true);
+      const token = localStorage.getItem("AccessToken");
+
+      const res = await axios.post(
+        BASE_URL + `/units/toggle_unit.php`,
+        { unit_id: openStatusModal.unit_id },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (res?.data?.status === "success") {
+        toast.success(res?.data?.message || "Unit status updated");
+
+        // refetch units after toggle
+        const unitsRes = await axios.post(
+          BASE_URL + "/units/select_course_units.php",
+          { course_id: id },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (unitsRes?.data?.status === "success") {
+          setAllUnits(unitsRes?.data?.message || []);
+        }
+
+        setOpenStatusModal(null);
+      } else {
+        toast.error(res?.data?.message || "Something went wrong");
+      }
+    } catch (e) {
+      console.log(e);
+      toast.error("Failed to update unit status");
+    } finally {
+      setOpenStatusLoading(false);
+    }
+  }
+
+  // 👇 HANDLE LOADING HERE
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-slate-600">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <p className="text-sm">Loading course units...</p>
+        </div>
+      </div>
+    );
+  }
+  // 👆 END LOADING HANDLER
+  console.log(selectedCourse);
 
   return (
     <div className="min-h-screen">
@@ -124,7 +244,7 @@ export default function courseUnitsPage() {
         <button
           type="button"
           onClick={() => router.push(`/courses/units/${id}/add-unit`)}
-          className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-3 py-2 text-sm hover:opacity-90"
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] !text-white px-3 py-2 text-sm hover:opacity-90"
         >
           <Plus size={16} /> Add
         </button>
@@ -141,10 +261,10 @@ export default function courseUnitsPage() {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="relative h-16 w-28 overflow-hidden rounded-xl ring-1 ring-slate-200">
-              {course?.video ? (
+              {selectedCourse?.video ? (
                 <video
-                  src={course?.video}
-                  poster={course?.poster}
+                  src={selectedCourse?.video}
+                  poster={selectedCourse?.image}
                   className="h-full w-full object-cover"
                   muted
                   playsInline
@@ -152,7 +272,7 @@ export default function courseUnitsPage() {
               ) : (
                 <img
                   src={
-                    course?.poster ||
+                    selectedCourse?.image ||
                     "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop"
                   }
                   alt="poster"
@@ -165,20 +285,19 @@ export default function courseUnitsPage() {
             </div>
             <div>
               <h1 className="text-lg font-semibold leading-tight line-clamp-2">
-                {course?.title}
+                {selectedCourse?.course_name}
               </h1>
               <p className="text-sm text-slate-600 line-clamp-2">
-                {course?.description}
+                {selectedCourse?.course_descreption}
               </p>
               <div className="mt-1 flex items-center gap-4 text-sm text-slate-600">
                 <span className="inline-flex items-center gap-1">
                   <ListChecks size={16} />
-                  {totalLessons} lessons
+                  {selectedCourse?.lessons} lessons
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <Clock3 size={16} />
-                  {fmtMinutes(totalLessons * 15)}{" "}
-                  {/* assume 15 min per lesson */}
+                  {fmtMinutes(selectedCourse?.lessons * 15)}
                 </span>
               </div>
             </div>
@@ -206,7 +325,7 @@ export default function courseUnitsPage() {
             onClick={() =>
               setExpanded(
                 Object.fromEntries(
-                  (course?.units || []).map((u) => [u.unitId, true])
+                  (allUnits || []).map((u) => [u.unit_id, true])
                 )
               )
             }
@@ -234,11 +353,12 @@ export default function courseUnitsPage() {
             </div>
           ) : (
             filteredUnits.map((unit) => {
-              const open = !!expanded[unit.unitId];
+              console.log(unit);
+              const open = !!expanded[unit.unit_id];
 
               return (
                 <section
-                  key={unit.unitId}
+                  key={unit.unit_id}
                   className="rounded-2xl border border-slate-200 bg-white overflow-hidden"
                 >
                   {/* Section header */}
@@ -248,44 +368,65 @@ export default function courseUnitsPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="grid place-items-center size-8 rounded-lg bg-slate-100 text-slate-700">
-                        {unit.unitNumber}
+                        {unit?.unit_id}
                       </div>
                       <div className="text-left">
-                        <h3 className="font-semibold">{unit.name}</h3>
-                        <p className="text-xs text-slate-600">
-                          {unit.lessonsCount} lessons
-                        </p>
+                        <div>
+                          <Link
+                            href={`/courses/units/${id}/unit-detail/${unit?.unit_id}`}
+                            onClick={() => {
+                              dispatch(setUnit(unit));
+                            }}
+                            className="font-medium text-slate-900"
+                          >
+                            {unit?.unit_title}
+                          </Link>
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-3 items-center">
+                      {/* Status toggle */}
                       <Tooltip
-                        title="Details"
-                        onClick={() =>
-                          router.push(
-                            `/courses/units/${unit.unitId}/unit-detail/${id}`
-                          )
+                        title={
+                          unit?.hidden == "1"
+                            ? "Show this unit"
+                            : "Hide this unit"
                         }
                       >
-                        <Eye size={15} />
+                        <button
+                          type="button"
+                          onClick={() => setOpenStatusModal(unit)}
+                          className="p-1 rounded-md hover:bg-slate-100"
+                        >
+                          {unit?.hidden == "1" ? (
+                            <EyeOff size={15} />
+                          ) : (
+                            <Eye size={15} />
+                          )}
+                        </button>
                       </Tooltip>
+
                       <Tooltip
                         title="Edit"
                         onClick={() =>
-                          router.push(`/courses/units/${id}/edit-unit/${id}`)
+                          router.push(
+                            `/courses/units/${id}/edit-unit/${unit?.unit_id}`
+                          )
                         }
                       >
                         <Pencil size={15} />
                       </Tooltip>
-                      <Tooltip 
-                      onClick={() => {
-                        setOpenDeleteModal(true)
-                        setRowData(unit)
-                      }}
-                      title="Delete">
+                      <Tooltip
+                        onClick={() => {
+                          setOpenDeleteModal(true);
+                          setRowData(unit);
+                        }}
+                        title="Delete"
+                      >
                         <Trash size={15} />
                       </Tooltip>
 
-                      <div className="" onClick={() => toggleUnit(unit.unitId)}>
+                      <div onClick={() => toggleUnit(unit.unit_id)}>
                         {open ? <ChevronUp /> : <ChevronDown />}
                       </div>
                     </div>
@@ -294,14 +435,14 @@ export default function courseUnitsPage() {
                   {/* Lessons list */}
                   {open && (
                     <ul className="divide-y divide-slate-200">
-                      {unit.videos.map((video, i) => {
-                        const lessonId = `${unit.unitId}-lesson-${i + 1}`;
+                      {(unit.videos || []).map((video, i) => {
+                        const lessonId = `${unit.unit_id}-lesson-${i + 1}`;
                         const done = !!completed[lessonId];
 
                         return (
                           <li
                             key={lessonId}
-                            className="flex items-center  justify-between gap-3 px-4 py-3"
+                            className="flex items-center justify-between gap-3 px-4 py-3"
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <button
@@ -326,8 +467,7 @@ export default function courseUnitsPage() {
                                 </div>
                                 <div className="text-xs text-slate-500 flex items-center gap-2">
                                   <Clock3 size={14} />
-                                  <span>{fmtMinutes(15)}</span>{" "}
-                                  {/* assumed 15 minutes per lesson */}
+                                  <span>{fmtMinutes(15)}</span>
                                 </div>
                               </div>
                             </div>
@@ -362,22 +502,20 @@ export default function courseUnitsPage() {
           <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-slate-700">
             <div className="rounded-xl border border-slate-200 p-3">
               <div className="text-xs text-slate-500">Level</div>
-              <div className="font-medium">{course?.level}</div>
+              <div className="font-medium">{selectedCourse?.level}</div>
             </div>
             <div className="rounded-xl border border-slate-200 p-3">
               <div className="text-xs text-slate-500">Duration</div>
-              <div className="font-medium">{course?.duration}</div>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-3 col-span-2">
-              <div className="text-xs text-slate-500">Teacher</div>
-              <div className="font-medium">{course?.teacher}</div>
+              <div className="font-medium">{selectedCourse?.Duration}</div>
             </div>
           </div>
 
           <div className="mt-4">
             <button
-              onClick={() => router.push(`/courses/${course?.id}`)}
-              className="w-full rounded-xl bg-[var(--primary-color)] text-white px-4 py-2 text-sm font-medium hover:opacity-90"
+              onClick={() =>
+                router.push(`/courses/${selectedCourse?.course_id}`)
+              }
+              className="w-full rounded-xl bg-[var(--primary-color)] !text-white px-4 py-2 text-sm font-medium hover:opacity-90"
             >
               Go to course? overview
             </button>
@@ -385,8 +523,53 @@ export default function courseUnitsPage() {
         </aside>
       </div>
 
+      {/* Status Modal */}
+      {openStatusModal && (
+        <div className="fixed inset-0 !z-[9999999999] flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
+            <h3 className="text-lg font-semibold">
+              {openStatusModal?.hidden == "1"
+                ? "Show this unit?"
+                : "Hide this unit?"}
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              {openStatusModal?.hidden == "1"
+                ? "This unit is currently hidden. Do you want to make it visible to students?"
+                : "This unit is currently visible. Do you want to hide it from students?"}
+            </p>
 
-      <DeleteModal open={openDeleteModal} title={"Delte This Unit"} description={`Do You Want to delete this ${rowData?.title}?`} setOpen={setOpenDeleteModal} handleSubmit={handleSubmit}/>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOpenStatusModal(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50"
+                disabled={openStatusLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleChangeStatus}
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] px-4 py-2 text-sm !text-white hover:opacity-90 disabled:opacity-70"
+                disabled={openStatusLoading}
+              >
+                {openStatusLoading && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DeleteModal
+        open={openDeleteModal}
+        title={"Delete This Unit"}
+        description={`Do you want to delete this ${rowData?.unit_title}?`}
+        setOpen={setOpenDeleteModal}
+        handleSubmit={handleSubmit}
+      />
     </div>
   );
 }

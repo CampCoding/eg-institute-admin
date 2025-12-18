@@ -5,29 +5,26 @@ import { useRouter, useParams } from "next/navigation";
 import { courses } from "@/utils/data";
 import { ArrowLeft, Pencil, Plus, Save, X } from "lucide-react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
+import axios from "axios";
+import { BASE_URL } from "../../../../../../utils/base_url";
+import toast from "react-hot-toast";
 
 export default function EditUnitPage() {
-  const { editId } = useParams();
+  const { editId  , unitId} = useParams();
   const router = useRouter();
-  const [rowData , setRowData] = useState({});
   const [openDeleteModal , setOpenDeleteModal] = useState(false);
+
   const [course, setCourse] = useState(
-    courses?.find((c) => c.id === parseInt(editId))
+    courses?.find((c) => c.id === parseInt(unitId))
   );
   const [unit, setUnit] = useState({
-    name: course?.title,
+    name: "",
     unitNumber: course?.units?.length + 1 || 1,
-    lessonsCount: course?.lessons,
+    lessonsCount: 0,
     videos: [""],
     pdfs: [""],
   });
-
-  useEffect(() => {
-    if(editId){
-      setCourse(courses?.find((c) => c.id === parseInt(editId)))
-    }
-  } , [editId])
-
+ 
   const handleInputChange = (e, field) => {
     const { value } = e.target;
     setUnit((prevUnit) => ({ ...prevUnit, [field]: value }));
@@ -57,37 +54,66 @@ export default function EditUnitPage() {
     const updatedPdfs = unit.pdfs.filter((_, i) => i !== index);
     setUnit((prevUnit) => ({ ...prevUnit, pdfs: updatedPdfs }));
   };
+ 
+
+
+  const [selectedUnit , setSelectedUnit] = useState({});
+  const [isLoading,  setIsLoading] = useState(false);
+  
+  useEffect(() => {
+    const token = localStorage.getItem("AccessToken");
+    axios.post(BASE_URL+"/units/select_course_units.php",{course_id : unitId},{
+      headers : {
+        "Authorization" :`Bearer ${token}`
+      }
+    }).then(res => {
+      if(res?.data?.status == "success") {
+        const filtered = res?.data?.message?.find(item => item?.unit_id == unitId);
+        setUnit({name:  filtered?.unit_title})
+        setSelectedUnit(filtered);
+      }
+    })
+  } , [unitId])
+
+  useEffect(() => {
+    setUnit({
+      name:  selectedUnit?.unit_title
+    })
+  } , [selectedUnit])
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const token = localStorage.getItem("AccessToken");
 
     // Validate fields
-    if (!unit.name || !unit.videos.length || !unit.pdfs.length) {
+    if (!unit.name) {
       alert("Please fill out all fields before submitting.");
       return;
     }
-
-    const newUnit = {
-      ...unit,
-      unitId: course.units.length + 1,
-      unitNumber: course.units.length + 1,
-    };
-
-    const updatedCourse = {
-      ...course,
-      units: [...course.units, newUnit],
-    };
-
-    // Save the updated course (this is a placeholder, replace with your actual saving method)
-    if (typeof window !== "undefined") {
-      const updatedCourses = courses.map((c) =>
-        c.id === course.id ? updatedCourse : c
-      );
-      localStorage.setItem("courses", JSON.stringify(updatedCourses));
+    const data_send = {
+      unit_title : unit?.name,
+      unit_id : editId,
+      
     }
-
-    router.push(`/courses/${course.id}`);
+    setIsLoading(true);
+    axios.post(BASE_URL+"/units/edit_unit.php",data_send , {
+      headers : {
+        "Authorization":`Bearer ${token}`
+      }
+    })
+    .then(res => {
+      if(res?.data?.status == "success") {
+        toast.success(res?.data?.message);
+        router.push(`/courses/units/${unitId}`)
+        setUnit({name:""});
+      }else {
+        toast.error(res?.data?.message);
+      }
+    }).catch(e => console.log(e))
+    .finally(() => setIsLoading(false))
   };
+
+  
 
   return (
     <div className="min-h-screen">
@@ -109,15 +135,15 @@ export default function EditUnitPage() {
           <div className="mt-4">
             <label className="text-sm font-medium">Unit Name</label>
             <input
-              value={unit.name}
+              value={unit?.name}
               onChange={(e) => handleInputChange(e, "name")}
               placeholder="Enter unit name"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+              className="mt-1 w-full rounded-xl border border-gray-500/50 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
             />
           </div>
 
           {/* Unit Lessons Count */}
-          <div className="mt-4">
+          {/* <div className="mt-4">
             <label className="text-sm font-medium">Lessons Count</label>
             <input
               type="number"
@@ -127,10 +153,10 @@ export default function EditUnitPage() {
               placeholder="Enter number of lessons"
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
             />
-          </div>
+          </div> */}
 
           {/* Unit Videos */}
-          <div className="mt-4">
+          {/* <div className="mt-4">
             <label className="text-sm font-medium">Unit Videos</label>
             {unit.videos.map((video, index) => (
               <div key={index} className="flex items-center gap-3 mt-2">
@@ -157,10 +183,10 @@ export default function EditUnitPage() {
             >
               <Plus size={16} /> Add Video
             </button>
-          </div>
+          </div> */}
 
           {/* Unit PDFs */}
-          <div className="mt-4">
+          {/* <div className="mt-4">
             <label className="text-sm font-medium">Unit PDFs</label>
             {unit.pdfs.map((pdf, index) => (
               <div key={index} className="flex items-center gap-3 mt-2">
@@ -187,17 +213,19 @@ export default function EditUnitPage() {
             >
               <Plus size={16} /> Add PDF
             </button>
-          </div>
+          </div> */}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center mt-2 gap-3">
           <button
             type="submit"
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-4 py-2 font-medium hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] !text-white px-4 py-2 font-medium hover:opacity-90"
           >
-            <Save size={18} />
+           {isLoading ?"Loading...." : <div className="flex gap-1 items-center"> <Save size={18} />
             Save Unit
+            </div> }
+            
           </button>
           <button
             type="button"

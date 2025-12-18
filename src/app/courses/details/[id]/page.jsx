@@ -119,7 +119,7 @@ export default function CourseDetailsPage() {
     );
   }
 
-  if (!rowData) {
+/*   if (!rowData) {
     return (
       <div className="min-h-screen">
         <BreadCrumb title="Details Of Course" parent="Courses" child="Detail" />
@@ -135,7 +135,7 @@ export default function CourseDetailsPage() {
         </div>
       </div>
     );
-  }
+  } */
 
   const overview = rowData?.overview || defaultOverview;
   const freeTrials = rowData?.freeTrials?.length ? rowData.freeTrials : defaultFreeTrials;

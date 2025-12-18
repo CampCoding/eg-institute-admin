@@ -104,7 +104,6 @@ export const courses = [
   },
 ];
 
-
 export const teachers = [
   {
     id: 1,
@@ -240,7 +239,6 @@ export const PRODUCTS = [
   },
 ];
 
-
 export const reservations = [
   {
     id: "r1",
@@ -277,74 +275,74 @@ export const reservations = [
   },
 ];
 
-export const finance_transactions =    [
-  { 
-    id: 1, 
-    date: "2025-08-01", 
-    description: "Course Payment - English", 
-    type: "income", 
-    amount: 250, 
+export const finance_transactions = [
+  {
+    id: 1,
+    date: "2025-08-01",
+    description: "Course Payment - English",
+    type: "income",
+    amount: 250,
     status: "completed",
     category: "Course Fees",
     paymentMethod: "Credit Card",
-    reference: "TXN001"
+    reference: "TXN001",
   },
-  { 
-    id: 2, 
-    date: "2025-08-02", 
-    description: "Instructor Salary - July", 
-    type: "expense", 
-    amount: 1200, 
+  {
+    id: 2,
+    date: "2025-08-02",
+    description: "Instructor Salary - July",
+    type: "expense",
+    amount: 1200,
     status: "paid",
     category: "Salaries",
     paymentMethod: "Bank Transfer",
-    reference: "TXN002"
+    reference: "TXN002",
   },
-  { 
-    id: 3, 
-    date: "2025-08-04", 
-    description: "Book Sale Revenue", 
-    type: "income", 
-    amount: 850, 
+  {
+    id: 3,
+    date: "2025-08-04",
+    description: "Book Sale Revenue",
+    type: "income",
+    amount: 850,
     status: "completed",
     category: "Sales",
     paymentMethod: "Cash",
-    reference: "TXN003"
+    reference: "TXN003",
   },
-  { 
-    id: 4, 
-    date: "2025-08-05", 
-    description: "Electricity Bill - July", 
-    type: "expense", 
-    amount: 160, 
+  {
+    id: 4,
+    date: "2025-08-05",
+    description: "Electricity Bill - July",
+    type: "expense",
+    amount: 160,
     status: "pending",
     category: "Utilities",
     paymentMethod: "Auto Debit",
-    reference: "TXN004"
+    reference: "TXN004",
   },
-  { 
-    id: 5, 
-    date: "2025-08-06", 
-    description: "Workshop Registration", 
-    type: "income", 
-    amount: 450, 
+  {
+    id: 5,
+    date: "2025-08-06",
+    description: "Workshop Registration",
+    type: "income",
+    amount: 450,
     status: "completed",
     category: "Events",
     paymentMethod: "PayPal",
-    reference: "TXN005"
+    reference: "TXN005",
   },
-  { 
-    id: 6, 
-    date: "2025-08-07", 
-    description: "Office Supplies", 
-    type: "expense", 
-    amount: 75, 
+  {
+    id: 6,
+    date: "2025-08-07",
+    description: "Office Supplies",
+    type: "expense",
+    amount: 75,
     status: "paid",
     category: "Supplies",
     paymentMethod: "Credit Card",
-    reference: "TXN006"
-  }
-]
+    reference: "TXN006",
+  },
+];
 
 export const general_data = [
   {
@@ -371,7 +369,11 @@ export const general_data = [
     target: { id: "sys_billing", role: "system", name: "Billing" },
     amount: 49,
     currency: "USD",
-    metadata: { courseId: "crs_msa_beg", method: "Card ••4321", invoiceId: "inv_7751" },
+    metadata: {
+      courseId: "crs_msa_beg",
+      method: "Card ••4321",
+      invoiceId: "inv_7751",
+    },
     view: {
       title: "دفع رسوم",
       badge: { text: "دفعة", color: "blue" },
@@ -390,7 +392,11 @@ export const general_data = [
     at: "2025-08-11T09:02:55.000Z",
     actor: { id: "stu_1023", role: "student", name: "Omar Ali" },
     target: { id: "tch_209", role: "teacher", name: "Mariam Fathi" },
-    metadata: { subject: "Egyptian Arabic", reason: "Student choice", channel: "in-app" },
+    metadata: {
+      subject: "Egyptian Arabic",
+      reason: "Student choice",
+      channel: "in-app",
+    },
     view: {
       title: "تسجيل مع مدرس",
       badge: { text: "إسناد مدرس", color: "violet" },
@@ -407,7 +413,10 @@ export const general_data = [
     type: "COURSE_ENROLLED",
     at: "2025-08-11T09:15:21.000Z",
     actor: { id: "stu_1188", role: "student", name: "Lina Ahmed" },
-    metadata: { courseId: "crs_egy_conv", courseTitle: "Egyptian Arabic: Everyday Conversation" },
+    metadata: {
+      courseId: "crs_egy_conv",
+      courseTitle: "Egyptian Arabic: Everyday Conversation",
+    },
     view: {
       title: "التحاق بدورة",
       badge: { text: "دورة", color: "teal" },
@@ -423,7 +432,11 @@ export const general_data = [
     type: "LESSON_COMPLETED",
     at: "2025-08-11T09:55:02.000Z",
     actor: { id: "stu_1188", role: "student", name: "Lina Ahmed" },
-    metadata: { courseId: "crs_egy_conv", lessonId: "ls_05", lessonTitle: "Greetings & Small Talk" },
+    metadata: {
+      courseId: "crs_egy_conv",
+      lessonId: "ls_05",
+      lessonTitle: "Greetings & Small Talk",
+    },
     view: {
       title: "إنهاء درس",
       badge: { text: "تقدم", color: "amber" },
@@ -440,7 +453,10 @@ export const general_data = [
     type: "TEACHER_CREATED_COURSE",
     at: "2025-08-10T18:20:40.000Z",
     actor: { id: "tch_209", role: "teacher", name: "Mariam Fathi" },
-    metadata: { courseId: "crs_msa_inter", courseTitle: "MSA Core Grammar & Vocabulary" },
+    metadata: {
+      courseId: "crs_msa_inter",
+      courseTitle: "MSA Core Grammar & Vocabulary",
+    },
     view: {
       title: "إنشاء دورة جديدة",
       badge: { text: "مدرس", color: "pink" },

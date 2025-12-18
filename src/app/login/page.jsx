@@ -3,8 +3,10 @@ import axios from "axios";
 import React, { useState } from "react";
 import { BASE_URL } from "../../utils/base_url";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 const page = () => {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -24,7 +26,10 @@ const page = () => {
       .then((res) => {
         if (res.data.status === "success") {
           toast.success("Login successful!");
-          localStorage.setItem("AdminToken", res.data.message.access_token);
+          localStorage.setItem("AccessToken", res.data.message.access_token);
+          localStorage.setItem("RefreshToken", res.data.message.refresh_token);
+          localStorage.setItem("UserId", res.data.message.admin_id);
+
           setTimeout(() => {
             window.location.href = "/";
           }, 1000);

@@ -21,6 +21,8 @@ import {
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { Tooltip } from "antd";
 import { useRouter } from "next/navigation";
+import useGetAllStudents from "../../utils/Api/GetAllStudents";
+import { Loader2 } from "lucide-react";
 
 export default function StudentsPage() {
   const router = useRouter();
@@ -31,7 +33,29 @@ export default function StudentsPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [viewMode, setViewMode] = useState("table"); // table or grid
 
-  const [students, setStudents] = useState([
+  
+  const { data, isLoading, isError } = useGetAllStudents();
+  console.log({ data, isLoading, isError });
+
+  const students = data?.message?.map((student) => {
+    return {
+      id: student?.student_id,
+      name: student?.student_name,
+      email: student?.student_email,
+      country: student?.country,
+      timezone: student?.time_zone,
+      password: student?.password,
+      phone: student?.phone,
+      group: student?.student_group || "-",
+      level: student?.level || "Not subscribe",
+      status: student?.student_status === 0 ? "Inactive" : "Active",
+      enrollmentDate: "2023-09-15",
+      avatar: student?.image || "https://i.pravatar.cc/100?img=1",
+    };
+  });
+  console.log(students);
+
+  /*  const [students, setStudents] = useState([
     {
       id: 1,
       name: "Sarah Johnson",
@@ -116,9 +140,28 @@ export default function StudentsPage() {
       enrollmentDate: "2023-10-01",
       avatar: "https://i.pravatar.cc/100?img=6",
     },
-  ]);
+  ]); */
 
-  const filteredStudents = students.filter((student) => {
+  /*  const filteredStudents = students.filter((student) => {
+    const matchesSearch =
+      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.country.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === "all"
+        ? true
+        : student.status.toLowerCase() === statusFilter.toLowerCase();
+
+    const matchesGroup =
+      groupFilter === "all" ? true : student.group === groupFilter;
+
+    const matchesLevel =
+      levelFilter === "all" ? true : student.level === levelFilter;
+
+    return matchesSearch && matchesStatus && matchesGroup && matchesLevel;
+  }); */
+  const filteredStudents = students?.filter((student) => {
     const matchesSearch =
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -154,9 +197,10 @@ export default function StudentsPage() {
   };
 
   const getLevelColor = (level) => {
-    if (level === "hard") return "text-red-600 bg-red-50";
+    if (level === "advanced") return "text-red-600 bg-red-50";
     if (level === "intermediate") return "text-yellow-600 bg-yellow-50";
     if (level === "beginner") return "text-green-600 bg-green-50";
+    if (level === "Not subscribe") return "text-gray-600 bg-gray-100";
     return "text-gray-600 bg-gray-50";
   };
 
@@ -176,29 +220,29 @@ export default function StudentsPage() {
   const stats = [
     {
       title: "Total Students",
-      value: students.length,
+      value: students?.length,
       icon: UserOutlined,
       color: "bg-blue-500",
       change: "+12%",
     },
     {
       title: "Active Students",
-      value: students.filter((s) => s.status === "Active").length,
+      value: students?.filter((s) => s.status === "Active").length,
       icon: BookOutlined,
       color: "bg-green-500",
       change: "+8%",
     },
     {
       title: "Countries",
-      value: new Set(students.map((s) => s.country)).size,
+      value: new Set(students?.map((s) => s.country)).size,
       icon: GlobalOutlined,
       color: "bg-purple-500",
       change: "+2",
     },
     {
       title: "This Month",
-      value: students.filter((s) => {
-        const enrollDate = new Date(s.enrollmentDate);
+      value: students?.filter((s) => {
+        const enrollDate = new Date(s?.enrollmentDate);
         const currentDate = new Date();
         return (
           enrollDate.getMonth() === currentDate.getMonth() &&
@@ -211,8 +255,17 @@ export default function StudentsPage() {
     },
   ];
 
-  const uniqueGroups = [...new Set(students.map((s) => s.group))];
-  const uniqueLevels = [...new Set(students.map((s) => s.level))];
+  const uniqueGroups = [...new Set(students?.map((s) => s.group))];
+  const uniqueLevels = [...new Set(students?.map((s) => s.level))];
+  if (isLoading) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="inline-flex items-center gap-2 text-slate-600">
+          <Loader2 className="animate-spin" /> Loading Students.....
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -222,7 +275,7 @@ export default function StudentsPage() {
 
         {/* Statistics Cards */}
         <div className="grid px-2 sm:px-4 mt-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
+          {stats?.map((stat, index) => (
             <div
               key={index}
               className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200"
@@ -308,7 +361,7 @@ export default function StudentsPage() {
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Groups</option>
-                {uniqueGroups.map((group) => (
+                {uniqueGroups?.map((group) => (
                   <option key={group} value={group}>
                     Group {group}
                   </option>
@@ -321,7 +374,7 @@ export default function StudentsPage() {
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Levels</option>
-                {uniqueLevels.map((level) => (
+                {uniqueLevels?.map((level) => (
                   <option key={level} value={level}>
                     {level.charAt(0).toUpperCase() + level.slice(1)}
                   </option>
@@ -382,7 +435,7 @@ export default function StudentsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStudents.map((student) => (
+                    {filteredStudents?.map((student) => (
                       <tr
                         key={student.id}
                         className="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200"
@@ -496,7 +549,7 @@ export default function StudentsPage() {
             ) : (
               /* Grid View */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredStudents.map((student) => (
+                {filteredStudents?.map((student) => (
                   <div
                     key={student.id}
                     className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow duration-200"
@@ -587,7 +640,7 @@ export default function StudentsPage() {
               </div>
             )}
 
-            {filteredStudents.length === 0 && (
+            {filteredStudents?.length === 0 && (
               <div className="text-center py-12">
                 <UserOutlined className="text-4xl text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -601,15 +654,15 @@ export default function StudentsPage() {
           </div>
 
           {/* Pagination */}
-          {filteredStudents.length > 0 && (
+          {filteredStudents?.length > 0 && (
             <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
               <div className="text-sm text-gray-700">
                 Showing <span className="font-medium">1</span> to{" "}
                 <span className="font-medium">
-                  {Math.min(10, filteredStudents.length)}
+                  {Math.min(10, filteredStudents?.length)}
                 </span>{" "}
                 of{" "}
-                <span className="font-medium">{filteredStudents.length}</span>{" "}
+                <span className="font-medium">{filteredStudents?.length}</span>{" "}
                 results
               </div>
               <div className="flex gap-2">
