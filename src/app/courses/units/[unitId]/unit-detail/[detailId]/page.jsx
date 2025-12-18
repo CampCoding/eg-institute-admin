@@ -22,8 +22,9 @@ import useGetAllUnitPdfs from "@/utils/Api/Units/GetAllPdfs";
 import { Toggle } from "@/utils/Api/Toggle";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import useGetAllUnitQuizzes from "@/utils/Api/Units/GetAllQuizzesUnit";
+
 import useDeleteContent from "@/utils/Api/Units/DeletePdf"; // hook اللي فوق
+import useGetAllUnitQuizzes from "../../../../../../utils/Api/Units/GetAllQuizzesUnit";
 
 const fmtMinutes = (mins = 0) => {
   const h = Math.floor(mins / 60);
@@ -251,6 +252,8 @@ export default function Page() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { unitId, detailId } = useParams();
+  console.log({ unitId, detailId });
+
   const { unit: unitData } = useSelector((state) => state.Units);
 
   const [activeTab, setActiveTab] = useState("videos"); // videos | pdfs | quizzes
@@ -270,6 +273,7 @@ export default function Page() {
     detailId,
     type: "Unit",
   });
+  console.log(VideoData);
 
   // delete mutation (invalidate حسب tab)
   const { mutateAsync, isPending } = useDeleteContent({
@@ -319,10 +323,15 @@ export default function Page() {
         const response = await Toggle({
           payload: { pdf_id: item.pdf_id },
           url: "units/content/pdfs/toggle_show_pdf.php",
-          key: "unitPdfs",
+          key: ["unitPdfs", "Unit", detailId],
           queryClient,
         });
-        toast.success(response.message);
+        if (response.status === "success") {
+          queryClient.invalidateQueries(["unitPdfs", "Unit", detailId]);
+          toast.success(response.message);
+        } else {
+          toast.error(response.message);
+        }
       } else if (activeTab === "videos") {
         const response = await Toggle({
           payload: { video_id: item.video_id },
@@ -330,16 +339,26 @@ export default function Page() {
           key: "unitVideos",
           queryClient,
         });
-        toast.success(response.message);
+        if (response.status === "success") {
+          queryClient.invalidateQueries(["unitVideos", "Unit", detailId]);
+          toast.success(response.message);
+        } else {
+          toast.error(response.message);
+        }
       } else {
         // ✅ عدّل URL لو مختلف عندك
         const response = await Toggle({
-          payload: { quiz_id: item.quiz_id },
+          payload: { quiz_id: String(item?.quiz_id) },
           url: "units/content/quiz/toggle_show_quiz.php",
           key: "unitquizs",
           queryClient,
         });
-        toast.success(response.message);
+
+        if (response.status === "success") {
+          toast.success(response.message);
+        } else {
+          toast.error(response.message);
+        }
       }
     } catch (e) {}
   };
@@ -390,6 +409,7 @@ export default function Page() {
   const videos = VideoData?.message ?? [];
   const pdfs = PdfData?.message ?? [];
   const quizzes = QuizData?.message ?? [];
+  console.log(quizzes);
 
   return (
     <div className="min-h-screen">

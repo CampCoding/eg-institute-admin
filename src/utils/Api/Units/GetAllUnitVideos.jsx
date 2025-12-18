@@ -2,15 +2,19 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { BASE_URL } from "../../base_url";
 
-export default function useGetAllUnitVideos({ detailId }) {
-  const payload = { unit_id: detailId };
-  console.log(payload);
+export default function useGetAllUnitVideos({ detailId, type = "Unit" }) {
+  const payload = {};
+  if (type === "Group") {
+    payload.group_id = detailId;
+  } else {
+    payload.unit_id = detailId;
+  }
 
   async function fetchUnitVideos() {
     const token = localStorage.getItem("AccessToken");
 
     const res = await axios.post(
-      `${BASE_URL}/units/content/videos/select_videos.php`,
+      `${BASE_URL}/units/content/videos/select_video_by${type}Id.php`,
       payload,
       {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -21,7 +25,7 @@ export default function useGetAllUnitVideos({ detailId }) {
   }
 
   return useQuery({
-    queryKey: ["unitVideos"],
+    queryKey: ["unitVideos", type, detailId],
     queryFn: fetchUnitVideos,
     retry: 1,
     enabled:

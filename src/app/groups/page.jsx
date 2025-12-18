@@ -16,12 +16,16 @@ import {
   ChevronDown,
   UsersRound,
   BookCheck,
+  Space,
+  EllipsisVertical,
+  BookCheckIcon,
+  Video,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
 
 import axios from "axios";
-import { Spin } from "antd";
+import { Dropdown, Spin } from "antd";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../../utils/base_url";
 import useGetAllGroups from "../../utils/Api/Groups/GetAllGroups";
@@ -42,6 +46,35 @@ export default function Page() {
   const router = useRouter();
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [rowData, setRowData] = useState({});
+  const items = [
+    {
+      key: "videos",
+      label: "Videos",
+      icon: <Video />,
+    },
+    {
+      key: "Pdf",
+      label: "Pdf",
+      icon: <BookOpen />,
+    },
+    {
+      key: "Quizzes",
+      label: "Quizzes",
+      icon: <BookCheckIcon />,
+    },
+  ];
+
+  const handleDropDownClick = ({ info, id }) => {
+    const { key } = info;
+    const g_id = id;
+    if (key === "videos") {
+      router.push(`/groups/GroupContent/${g_id}?type=video`);
+    } else if (key === "Pdf") {
+      router.push(`/groups/GroupContent/${g_id}?type=pdf`);
+    } else if (key === "Quizzes") {
+      router.push(`/groups/GroupContent/${g_id}?type=quiz`);
+    }
+  };
 
   // Map API data → groups state
   useEffect(() => {
@@ -424,12 +457,17 @@ export default function Page() {
                     onClick={() => {}}
                     className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
                   >
-                    <Link
-                    className=" flex items-center justify-center gap-1"
-                      href={`/groups/GroupQuizzes/${g.id}`}>
-                        
-                      <BookCheck size={16} /> Groups Quizzes
-                    </Link>
+                    <Dropdown
+                      menu={{
+                        items,
+                        onClick: (info) =>
+                          handleDropDownClick({ info, id: g.id }),
+                      }}
+                    >
+                      <a onClick={(e) => e.preventDefault()}>
+                        <EllipsisVertical />
+                      </a>
+                    </Dropdown>
                   </button>
                 </div>
               </div>

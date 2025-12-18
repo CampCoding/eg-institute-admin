@@ -24,7 +24,7 @@ export default function useGetAllUnitQuizzes({ detailId, type }) {
   }
 
   return useQuery({
-    queryKey: ["unitquizs"],
+    queryKey: ["unitquizs", type, detailId],
     queryFn: fetchUnitQuizzes,
     retry: 1,
     enabled:

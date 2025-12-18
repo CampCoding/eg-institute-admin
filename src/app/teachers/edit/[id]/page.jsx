@@ -152,7 +152,7 @@ export default function AddTeacherPage() {
       name: teacher?.name ?? "",
       email: teacher?.teacher_email || teacher?.email || "",
       phone: teacher?.phone ?? "",
-      title: teacher?.specialization ?? "",
+      title: teacher?.specialization ?? teacher?.title ?? "",
       summary: teacher?.summary ?? "",
       photo: teacher?.teacher_image ?? DEFAULT_PHOTO,
 
@@ -237,7 +237,7 @@ export default function AddTeacherPage() {
       <div className="flex mb-4 items-center gap-2">
         <button
           type="button"
-          onClick={() => router.push("/teachers")}
+          onClick={() => router.back()}
           className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
         >
           <ArrowLeft size={16} className="inline -mt-0.5 mr-1" />
@@ -395,83 +395,92 @@ export default function AddTeacherPage() {
                 <Input placeholder="25" />
               </RHFFormItem>
             </div>
-            <div className="my-2  ">
-              <div className="grid  gap-3">
+            {/* Availability / Slots */}
+            <div className="my-2">
+              <div className="space-y-4">
                 {fields.map((item, index) => (
                   <div
                     key={item.id}
-                    className="grid grid-cols-1 lg:grid-cols-4 gap-3"
+                    className="rounded-2xl border border-slate-200 bg-white p-4"
                   >
-                    <RHFFormItem
-                      name={`teacher_slots.${index}.day`}
-                      control={control}
-                      label="Day"
-                      required
-                    >
-                      {({ field }) => (
-                        <Select
-                          value={field.value}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          placeholder="Day"
-                        >
-                          {days.map((d) => (
-                            <Select.Option key={d} value={d}>
-                              {d}
-                            </Select.Option>
-                          ))}
-                        </Select>
-                      )}
-                    </RHFFormItem>
+                    {/* Header row (responsive) */}
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-800">
+                        Slot #{index + 1}
+                      </p>
 
-                    <RHFFormItem
-                      name={`teacher_slots.${index}.slots_from`}
-                      control={control}
-                      label="From"
-                      required
-                    >
-                      {({ field }) => (
-                        <TimePicker
-                          value={toMoment(field.value)}
-                          onChange={(v) => field.onChange(toTimeString(v))}
-                          format="HH:mm"
-                          className="w-full"
-                        />
-                      )}
-                    </RHFFormItem>
-
-                    <RHFFormItem
-                      name={`teacher_slots.${index}.slots_to`}
-                      control={control}
-                      label="To"
-                      required
-                    >
-                      {({ field }) => (
-                        <TimePicker
-                          value={toMoment(field.value)}
-                          onChange={(v) => field.onChange(toTimeString(v))}
-                          format="HH:mm"
-                          className="w-full"
-                        />
-                      )}
-                    </RHFFormItem>
-
-                    <div className="w-full">
-                      <Button
-                        danger
-                        className="w-full"
-                        onClick={() => remove(index)}
-                      >
-                        Remove
+                      {/* Remove: icon on mobile, text on md+ */}
+                      <Button danger onClick={() => remove(index)}>
+                        <span className="hidden md:inline">Remove</span>
+                        <span className="md:hidden">✕</span>
                       </Button>
+                    </div>
+
+                    {/* Fields grid */}
+                    <div className="grid grid-cols-1  lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                      <RHFFormItem
+                        name={`teacher_slots.${index}.day`}
+                        control={control}
+                        label="Day"
+                        required
+                      >
+                        {({ field }) => (
+                          <Select
+                            value={field.value}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            placeholder="Day"
+                          >
+                            {days.map((d) => (
+                              <Select.Option key={d} value={d}>
+                                {d}
+                              </Select.Option>
+                            ))}
+                          </Select>
+                        )}
+                      </RHFFormItem>
+
+                      <RHFFormItem
+                        name={`teacher_slots.${index}.slots_from`}
+                        control={control}
+                        label="From"
+                        required
+                      >
+                        {({ field }) => (
+                          <TimePicker
+                            value={toMoment(field.value)}
+                            onChange={(v) => field.onChange(toTimeString(v))}
+                            format="HH:mm"
+                            className="w-full"
+                          />
+                        )}
+                      </RHFFormItem>
+
+                      <RHFFormItem
+                        name={`teacher_slots.${index}.slots_to`}
+                        control={control}
+                        label="To"
+                        required
+                      >
+                        {({ field }) => (
+                          <TimePicker
+                            value={toMoment(field.value)}
+                            onChange={(v) => field.onChange(toTimeString(v))}
+                            format="HH:mm"
+                            className="w-full"
+                          />
+                        )}
+                      </RHFFormItem>
                     </div>
                   </div>
                 ))}
 
+                {/* Add button responsive */}
                 <Button
                   type="dashed"
+                  className="w-full sm:w-auto"
                   onClick={() =>
-                    append({ day: "Monday", slots_from: null, slots_to: null })
+                    append({ day: "Monday", slots_from: "", slots_to: "" })
                   }
                 >
                   + Add Slot

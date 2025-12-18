@@ -5,35 +5,40 @@ import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import React from "react";
 import useGetTeacherById from "../../../../utils/Api/Teachers/GetTeacherById";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setTeacher } from "../../../../utils/Store/TeacherSlice";
+import { time } from "framer-motion";
 
 export default function InstructorProfile({ instructor }) {
   const router = useRouter();
   const { id } = useParams();
   const dispatch = useDispatch();
   const { data: teacher } = useGetTeacherById({ id });
+  console.log(teacher);
 
   const data = instructor || {
     id: teacher?.message?.teacher_id,
     name: teacher?.message?.teacher_name,
+    email: teacher?.message?.teacher_email,
+    phone: teacher?.message?.phone,
+    hourlyRate: teacher?.message?.hourly_rate,
+    specialties: teacher?.message.specialization,
+    bio: teacher?.message?.bio,
+    tags: teacher?.message?.tags,
+    level: teacher?.message?.level,
+    timezone: teacher?.message?.timezone,
+    country: teacher?.message?.country,
     avatar:
       teacher?.message?.teacher_image ||
       "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=1400&auto=format&fit=crop",
-    email: teacher?.message?.teacher_email,
-    phone: teacher?.message?.phone,
     status: "Active",
     role: "Arabic Instructor",
-    level: teacher?.message?.level,
 
-    specialties: [teacher?.specialization],
     langs: teacher?.message?.languages || [
       "Arabic (Native)",
       "English (C1)",
       "French (B1)",
     ],
-    hourlyRate: teacher?.message?.hourly_rate,
-    bio: teacher?.message?.bio,
     rating: teacher?.message?.rate,
     satisfaction: 96,
     studentsCount: teacher?.message?.student_count,
@@ -73,40 +78,81 @@ export default function InstructorProfile({ instructor }) {
       { name: "Leo", rating: 4, text: "Engaging and structured lessons." },
     ],
   };
+  console.log(data);
 
+  // Helpers
+  const capitalize = (s) =>
+    typeof s === "string" && s.length
+      ? s.charAt(0).toUpperCase() + s.slice(1)
+      : "";
+
+  // ✅ teacher: هو الريسبونس (أو teacher?.message حسب انت بتجيبها ازاي)
   const teacherFromApiToForm = {
     name: data?.name ?? "",
-    teacher_email: data?.email ?? "",
+
+    // زي التاني: prefer teacher_email ثم email
+    email: data?.teacher_email || data?.email || "",
+
     phone: data?.phone ?? "",
-    specialization: teacher?.message?.specialization ?? "",
-    summary: data?.bio ?? "",
-    photo: data?.avatar ?? "",
+
+    // زي التاني: title = specialization (ولو عندك specialties array خليه fallback)
+    title: data?.specialties ?? "",
+
+    // زي التاني: summary = summary أو bio
+    summary: data?.summary ?? data?.bio ?? "",
+
+    // زي التاني: photo
+    photo: data?.teacher_image ?? data?.avatar ?? DEFAULT_PHOTO,
 
     country: data?.country ?? "",
-    TimeZone: data?.time_zone || "Africa/Cairo",
 
-    hourly_rate: data?.hourlyRate ?? "",
-    level: data?.level
-      ? data.level.charAt(0).toUpperCase() + data.level.slice(1) // "beginner" → "Beginner"
-      : "Expert",
+    // زي التاني
+    TimeZone:
+      data?.time_zone && data.time_zone.trim()
+        ? data.time_zone
+        : "Africa/Cairo",
 
-    // tags: string من الـ API → array للفورم
+    // زي التاني: hourly_rate
+    hourly_rate: data?.hourly_rate ?? data?.hourlyRate ?? "",
+
+    // زي التاني: level (ولو جاي lower-case حوّله)
+    level: data?.level ? capitalize(data.level) : "Expert",
+
+    // زي التاني: tags => array
     tags:
-      typeof teacher?.message?.tags === "string"
-        ? teacher?.message.tags
+      typeof data?.tags === "string"
+        ? data.tags
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean)
-        : Array.isArray(teacher?.message?.tags)
-        ? teacher?.message?.tags
+        : Array.isArray(data?.tags)
+        ? data.tags
         : [],
 
-    // Languages: نفس اللي جاي من الـ API
-    Languages: Array.isArray(data?.languages) ? data.languages : [],
+    // زي التاني: Languages (ولو عندك langs fallback)
+    Languages: Array.isArray(data?.languages)
+      ? data.languages
+      : Array.isArray(data?.langs)
+      ? data.langs
+      : [],
 
-    // مفيش teacher_slots في الريسبونس → نخليها فاضية
-    teacher_slots: [],
+    // ✅ زي التاني بالظبط: teacher_slots (مش availability)
+    // وخليه يرجع "HH:mm:ss" زي ما التاني عامل
+    teacher_slots: Array.isArray(data?.teacher_slots)
+      ? data.teacher_slots.map((s) => ({
+          day: s?.day ?? "Monday",
+          slots_from: s?.slots_from ?? "",
+          slots_to: s?.slots_to ?? "",
+        }))
+      : Array.isArray(data?.availability)
+      ? data.availability.map((s) => ({
+          day: s?.day ?? "Monday",
+          slots_from: s?.slots_from ?? "",
+          slots_to: s?.slots_to ?? "",
+        }))
+      : [],
   };
+
   console.log(teacherFromApiToForm);
 
   const Pill = ({ children, tone = "default" }) => {
@@ -343,7 +389,6 @@ export default function InstructorProfile({ instructor }) {
               </h2>
               <div className="space-y-3">
                 {data?.availability?.map((a) => {
-                  console.log(a);
                   const slot = `${a.slots_from} - ${a.slots_to}`;
 
                   return (
