@@ -97,7 +97,6 @@ export default function BlogsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [loading, setLoading] = useState(false);
-
   const [selectedBlog, setSelectedBlog] = useState(null);
 
   // hydrate from localStorage on mount
@@ -118,48 +117,35 @@ export default function BlogsPage() {
     });
   }, [searchTerm, blogs]);
 
-  const handleDelete = async (blog) => {
-    console.log(blog);
-
-    const response = await useDeleteBlog({ id: blog });
-    if (response.status === "success") {
-      toast.success("Blog deleted successfully!");
+  const handleDelete = async (blogId) => {
+    try {
+      const response = await useDeleteBlog({ id: blogId });
+      if (response.status === "success") {
+        toast.success("Blog deleted successfully!");
+        queryClient.invalidateQueries(["blogs"]);
+      } else {
+        toast.error(response.message || "Failed to delete blog");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("An error occurred while deleting the blog");
     }
   };
-  // delete selected blog (state + localStorage)
+
   async function handleSubmit() {
     if (!selectedBlog) return;
 
-    console.log(selectedBlog);
-
+    setLoading(true);
     const toDeleteId = selectedBlog?.blog_id;
-    console.log(toDeleteId);
-
-    // خزن نسخة للـrollback
-    const prevBlogs = blogs;
-
-    // 1) Optimistic update: شيل من UI فورًا
-    setBlogs((prev) => prev.filter((b) => b.blog_id !== toDeleteId));
-
-    // 2) اقفل المودال/فضي الاختيار
-    setOpenDeleteModal(false);
-    setSelectedBlog(null);
 
     try {
-      // 3) نفّذ الحذف الحقيقي (استناه)
       await handleDelete(toDeleteId);
-
-      // 4) حدّث localStorage بعد نجاح الحذف
+      setOpenDeleteModal(false);
+      setSelectedBlog(null);
     } catch (e) {
-      // 5) لو فشل: رجّع الـUI زي ما كان
-      setBlogs(prevBlogs);
-
-      // اختياري: رجّع المودال أو رسالة
-      // setOpenDeleteModal(true);
-      // setSelectedBlog(prevBlogs.find(b => b.id === toDeleteId) ?? null);
-
       console.error(e);
-      // toast.error("Delete failed");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -306,7 +292,7 @@ export default function BlogsPage() {
               </p>
 
               {/* meta */}
-              <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-600">
+              {/*    <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-600">
                 <div className="inline-flex items-center gap-2">
                   <div className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-[10px] font-semibold">
                     {b.author?.name?.[0] ?? "A"}
@@ -331,54 +317,52 @@ export default function BlogsPage() {
                     </svg>
                     {b.created_at}
                   </span>
-                  <span className="inline-flex items-center gap-1">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4">
-                      <path
-                        fill="currentColor"
-                        d="M12 8v5l4 2 .75-1.86-2.75-1.39V8z"
-                      />
-                    </svg>
-                    {b.readMins} min read
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4">
-                      <path
-                        fill="currentColor"
-                        d="M12 6c-5 0-9 3.58-9 8 0 1.93 1.05 3.68 2.78 5 .3.24.73.27 1.07.08l2.63-1.5c.28-.16.47-.46.5-.78l.13-1.3c.02-.24.14-.45.32-.6.37-.3.83-.47 1.33-.47 1.73 0 3.13-1.4 3.13-3.13S13.73 8.67 12 8.67c-.66 0-1.27.2-1.78.53-.36.22-.83.18-1.14-.1l-1.24-1.1c-.34-.31-.35-.85-.02-1.17C8.44 5.52 10.14 5 12 5c3.87 0 7 2.46 7 5.5S15.87 16 12 16"
-                      />
-                    </svg>
-                    {Intl.NumberFormat().format(b.views)}
-                  </span>
                 </div>
-              </div>
+              </div> */}
 
               {/* actions */}
-              <div className="mt-3 flex items-center gap-2">
-                <button
-                  onClick={() => router.push(`/blogs/edit/${b?.blog_id}`)}
-                  className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
-                  aria-label="Edit blog"
-                >
-                  <Edit size={18} />
-                </button>
+              <div className="flex justify-between items-center">
+                {" "}
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    onClick={() => router.push(`/blogs/edit/${b?.blog_id}`)}
+                    className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
+                    aria-label="Edit blog"
+                  >
+                    <Edit size={18} />
+                  </button>
 
-                <button
-                  onClick={() => {
-                    setSelectedBlog(b);
-                    setOpenDeleteModal(true);
-                  }}
-                  className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
-                  aria-label="Delete blog"
+                  <button
+                    onClick={() => {
+                      setSelectedBlog(b);
+                      setOpenDeleteModal(true);
+                    }}
+                    className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
+                    aria-label="Delete blog"
+                  >
+                    <Trash size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleToggleBlog(b.blog_id)}
+                    className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
+                    aria-label="Delete blog"
+                  >
+                    {b?.hidden !== "0" ? (
+                      <EyeClosed size={18} />
+                    ) : (
+                      <Eye size={18} />
+                    )}
+                  </button>
+                </div>
+                <div
+                  className={`text-xs !text-white p-2 rounded-xl ${
+                    b?.hidden !== "0"
+                      ? "bg-red-500"
+                      : "bg-[var(--primary-color)] "
+                  }`}
                 >
-                  <Trash size={18} />
-                </button>
-                <button
-                  onClick={() => handleToggleBlog(b.blog_id)}
-                  className="size-10 rounded-xl border border-slate-200 grid place-items-center hover:bg-slate-50"
-                  aria-label="Delete blog"
-                >
-                  {b?.hidden == 0 ? <EyeClosed size={18} /> : <Eye size={18} />}
-                </button>
+                  {b?.hidden !== "0" ? "Hidden" : "Visible"}
+                </div>
               </div>
             </div>
 

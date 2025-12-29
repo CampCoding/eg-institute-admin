@@ -166,12 +166,19 @@ export default function AddBlogPage() {
     }
 
     clearErrors("cover");
-    if (form.cover?.startsWith("blob:")) URL.revokeObjectURL(form.cover);
+    
+    // Revoke previous blob if any
+    if (form.cover?.startsWith("blob:")) {
+      URL.revokeObjectURL(form.cover);
+    }
 
     const url = URL.createObjectURL(file);
     setValue("coverFile", file, { shouldDirty: true });
     setValue("coverFileName", file.name, { shouldDirty: true });
     setValue("cover", url, { shouldDirty: true, shouldValidate: true });
+    
+    // Switch to file mode if not already
+    setUpload(uploadType.file);
   };
 
   const levelBadgeClass = (v) => {
@@ -607,36 +614,44 @@ export default function AddBlogPage() {
 
           {/* Right: live preview */}
           <div className="lg:sticky lg:top-24">
-            <div className="rounded-2xl bg-white border border-slate-200 p-5">
-              <h3 className="font-semibold">Live preview</h3>
-              <p className="text-sm text-slate-600">
-                Matches your blogs grid card.
-              </p>
+            <div className="rounded-2xl bg-white/80 backdrop-blur-xl border border-slate-200/60 p-6 shadow-xl shadow-slate-200/50">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
+                    Live preview
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    How it will appear in the grid
+                  </p>
+                </div>
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
 
               <article
-                className={`group relative mt-4 overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-xl transition-all duration-300 ${
+                className={`group relative overflow-hidden rounded-3xl bg-white transition-all duration-500 hover:-translate-y-1 ${
                   form.tag === "Featured"
-                    ? "border-[3px] border-teal-500 shadow-[0_8px_50px_-12px_rgba(20,184,166,0.35)]"
-                    : "border border-slate-200"
+                    ? "ring-2 ring-teal-500/50 shadow-2xl shadow-teal-500/20"
+                    : "border border-slate-100 shadow-lg shadow-slate-200/40 hover:shadow-xl hover:shadow-slate-200/60"
                 }`}
               >
-                <div className="relative h-44 sm:h-56 overflow-hidden">
+                <div className="relative h-48 sm:h-60 overflow-hidden">
                   <img
                     src={
                       form.cover ||
                       "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?q=80&w=1200&auto=format&fit=crop"
                     }
                     alt="Cover"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
                   />
-                  <div
-                    className={`absolute inset-0 bg-gradient-to-r ${form.gradient} opacity-25`}
-                  />
+                  
+                  {/* Overlay Gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                  <div className="absolute top-3 left-3 flex gap-2">
-                    {form.tag !== "None" && (
+                  {/* Badges Container */}
+                  <div className="absolute top-4 left-4 flex flex-wrap gap-2 transition-transform duration-500 group-hover:translate-y-1">
+                    {form.tag && form.tag !== "None" && (
                       <span
-                        className={`text-[11px] rounded-full px-2 py-1 ${levelBadgeClass(
+                        className={`backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${levelBadgeClass(
                           form.tag
                         )}`}
                       >
@@ -644,7 +659,7 @@ export default function AddBlogPage() {
                       </span>
                     )}
                     <span
-                      className={`text-[11px] rounded-full px-2 py-1 ${levelBadgeClass(
+                      className={`backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${levelBadgeClass(
                         form.level
                       )}`}
                     >
@@ -653,54 +668,74 @@ export default function AddBlogPage() {
                   </div>
 
                   {form.tag === "Featured" && (
-                    <div className="absolute right-3 top-3 rounded-full bg-black/50 text-white p-1">
-                      <Star size={16} />
+                    <div className="absolute right-4 top-4 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white p-2 shadow-lg animate-bounce-suble">
+                      <Star size={16} fill="currentColor" />
                     </div>
                   )}
+                  
+                  {/* Category Badge - Floating Bottom */}
+                  <div className="absolute bottom-4 left-4">
+                    <span className="px-2 py-1 rounded-lg bg-teal-500/90 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-widest shadow-lg">
+                      {form.category}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="p-4">
-                  <h2 className="text-base sm:text-lg font-semibold tracking-tight line-clamp-2">
-                    {form.title || "Blog title"}
-                  </h2>
-                  {form.title_ar && (
-                    <div className="mt-1 text-teal-700 text-sm font-medium line-clamp-1">
-                      {form.title_ar}
-                    </div>
-                  )}
-                  <p className="mt-2 text-slate-600 text-sm line-clamp-2">
-                    {form.excerpt || "A short summary will appear here."}
+                <div className="p-5 space-y-3">
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-bold text-slate-900 leading-tight line-clamp-2 group-hover:text-teal-600 transition-colors duration-300">
+                      {form.title || "Untitled Masterpiece"}
+                    </h2>
+                    {form.title_ar && (
+                      <div className="text-teal-600/80 text-sm font-semibold dir-rtl line-clamp-1 italic">
+                        {form.title_ar}
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-slate-600 text-sm line-clamp-2 leading-relaxed font-normal">
+                    {form.excerpt || "Your compelling story starts here. This summary will draw readers in..."}
                   </p>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-600">
-                    <div className="inline-flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-[10px] font-semibold">
+                  <div className="pt-4 flex items-center justify-between border-t border-slate-50">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white text-xs font-bold shadow-md">
                         {(form.author || "A")[0]}
                       </div>
-                      <div className="flex flex-col leading-tight">
-                        <span className="font-medium">
-                          {form.author || "Author"}
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-800">
+                          {form.author || "Staff Writer"}
                         </span>
-                        {form.category && (
-                          <span className="text-[11px] text-slate-500">
-                            {form.category}
-                          </span>
-                        )}
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {dayjs().format("MMM DD, YYYY")}
+                        </span>
                       </div>
                     </div>
-
-                    <div className="ml-auto flex items-center gap-3 text-xs sm:text-[13px]">
-                      <span className="inline-flex items-center gap-1">
-                        {form.date ? dayjs(form.date).format("YYYY-MM-DD") : ""}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        {form.readMins} min read
-                      </span>
-                      <span className="inline-flex items-center gap-1">0</span>
+                    
+                    <div className="flex items-center gap-3 text-slate-400">
+                       <span className="flex items-center gap-1 text-[11px] font-semibold">
+                         <Loader2 size={12} className="animate-spin-slow" />
+                         {form.readMins || 5} min
+                       </span>
                     </div>
                   </div>
                 </div>
               </article>
+              
+              <div className="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-white shadow-sm text-teal-600">
+                    <TagIcon size={16} />
+                  </div>
+                  <span className="text-sm font-bold text-slate-700">Display Settings</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Shadow</div>
+                  <div className="text-[10px] text-slate-700 font-bold text-right">{form.tag === "Featured" ? "Heavy" : "Light"}</div>
+                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Animation</div>
+                  <div className="text-[10px] text-slate-700 font-bold text-right">Slide-up</div>
+                </div>
+              </div>
             </div>
           </div>
         </form>

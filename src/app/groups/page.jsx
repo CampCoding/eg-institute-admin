@@ -463,6 +463,7 @@ export default function Page() {
                         onClick: (info) =>
                           handleDropDownClick({ info, id: g.id }),
                       }}
+                      trigger={["click"]}
                     >
                       <a onClick={(e) => e.preventDefault()}>
                         <EllipsisVertical />

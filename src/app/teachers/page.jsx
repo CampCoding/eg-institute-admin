@@ -199,7 +199,7 @@ export default function TeachersPage() {
               {/* Middle-right chevron button */}
               <button
                 onClick={() => router.push(`/teachers/profile/${t.id}`)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 size-9 grid place-items-center rounded-full bg-teal-600 text-white shadow-md hover:bg-teal-700"
+                className="absolute right-4 top-1/2 -translate-y-1/2 size-9 grid place-items-center rounded-full bg-teal-600 !text-white shadow-md hover:bg-teal-700"
                 aria-label="Open teacher"
               >
                 <ChevronRight size={18} />
@@ -248,7 +248,7 @@ export default function TeachersPage() {
               <div className="mt-5 flex items-center gap-2">
                 <button
                   onClick={() => router.push(`/teachers/profile/${t.id}`)}
-                  className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 text-white px-5 py-2.5 text-sm font-semibold hover:bg-teal-700"
+                  className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 !text-white px-5 py-2.5 text-sm font-semibold hover:bg-teal-700"
                 >
                   Details <ChevronRight size={16} />
                 </button>

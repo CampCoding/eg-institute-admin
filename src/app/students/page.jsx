@@ -33,7 +33,6 @@ export default function StudentsPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [viewMode, setViewMode] = useState("table"); // table or grid
 
-  
   const { data, isLoading, isError } = useGetAllStudents();
   console.log({ data, isLoading, isError });
 
@@ -293,7 +292,7 @@ export default function StudentsPage() {
                   </p>
                 </div>
                 <div className={`p-3 rounded-xl ${stat.color}`}>
-                  <stat.icon className="!text-white text-xl" />
+                  <stat.icon className="!!text-white text-xl" />
                 </div>
               </div>
             </div>
@@ -320,7 +319,7 @@ export default function StudentsPage() {
                 </button>
                 <button
                   onClick={() => router.push(`/students/add`)}
-                  className="px-4 py-2 bg-teal-600 !whitespace-nowrap text-white rounded-lg hover:bg-teal-700 transition-colors duration-200 flex items-center gap-2"
+                  className="px-4 py-2 bg-teal-600 !whitespace-nowrap !text-white rounded-lg hover:bg-teal-700 transition-colors duration-200 flex items-center gap-2"
                 >
                   <PlusOutlined />
                   Add Student
@@ -429,9 +428,9 @@ export default function StudentsPage() {
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">
                         Status
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                   {/*    <th className="text-left py-3 px-4 font-semibold text-gray-900">
                         Actions
-                      </th>
+                      </th> */}
                     </tr>
                   </thead>
                   <tbody>
@@ -513,7 +512,7 @@ export default function StudentsPage() {
                             {student.status}
                           </span>
                         </td>
-                        <td className="py-4 px-4">
+                     {/*    <td className="py-4 px-4">
                           <div className="flex gap-2">
                             <Tooltip
                               onClick={() =>
@@ -540,7 +539,7 @@ export default function StudentsPage() {
                               <DeleteOutlined />
                             </button>
                           </div>
-                        </td>
+                        </td> */}
                       </tr>
                     ))}
                   </tbody>
@@ -610,7 +609,7 @@ export default function StudentsPage() {
                       >
                         {student.status}
                       </span>
-                      <div className="flex gap-1">
+                     {/*  <div className="flex gap-1">
                         <button
                           onClick={() =>
                             router.push(`/students/profile/${student?.id}`)
@@ -633,7 +632,7 @@ export default function StudentsPage() {
                         >
                           <DeleteOutlined />
                         </button>
-                      </div>
+                      </div> */}
                     </div>
                   </div>
                 ))}
@@ -672,7 +671,7 @@ export default function StudentsPage() {
                 >
                   Previous
                 </button>
-                <button className="px-3 py-2 bg-blue-600 text-white rounded-lg">
+                <button className="px-3 py-2 bg-blue-600 !text-white rounded-lg">
                   1
                 </button>
                 <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200">
