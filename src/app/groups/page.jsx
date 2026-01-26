@@ -317,10 +317,6 @@ export default function Page() {
 
             {/* Sort */}
             <div className="relative">
-              <ChevronDown
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={18}
-              />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
@@ -410,6 +406,10 @@ export default function Page() {
                     <div className="text-sm text-slate-600">
                       <span className="font-medium">Instructor:</span>{" "}
                       {g.instructor}
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      <span className="font-medium">Course:</span>{" "}
+                      {g.course_name}
                     </div>
                   </div>
 

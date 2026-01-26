@@ -672,6 +672,7 @@ function CreateSessionModal({ slot, onClose, onCreate }) {
                 </label>
                 <input
                   type="number"
+                  onWheel={(e) => e.target.blur()}
                   min={1}
                   value={maxStudents}
                   onChange={(e) => setMaxStudents(Number(e.target.value))}
@@ -684,6 +685,7 @@ function CreateSessionModal({ slot, onClose, onCreate }) {
                 </label>
                 <input
                   type="number"
+                  onWheel={(e) => e.target.blur()}
                   min={0}
                   value={students}
                   onChange={(e) => setStudents(Number(e.target.value))}

@@ -1,154 +1,105 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { useRouter } from "next/navigation";
 import { Trash, Pencil, Video, Users, Clock, Calendar } from "lucide-react";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
-
-// Mock data for live courses
-const liveCourses = [
-  {
-    id: 1,
-    title: "Advanced JavaScript Masterclass",
-    description:
-      "Live interactive sessions covering advanced JavaScript concepts, ES6+, and modern frameworks.",
-    teacher: "Sarah Johnson",
-    level: "Advanced",
-    duration: "8 weeks",
-    price: "$299",
-    students: 45,
-    maxStudents: 50,
-    nextSession: "2024-01-15T10:00:00",
-    meetingLink: "https://zoom.us/j/123456789",
-    status: "Active",
-    poster:
-      "https://images.unsplash.com/photo-1627398242454-45a1465c2479?q=80&w=1400&auto=format&fit=crop",
-    color: "from-blue-500 to-purple-600",
-    sessions: 16,
-    completedSessions: 6,
-    schedule: "Mon, Wed, Fri - 10:00 AM",
-    timezone: "EST",
-  },
-  {
-    id: 2,
-    title: "React Development Bootcamp",
-    description:
-      "Comprehensive live training on React.js with hands-on projects and real-time coding sessions.",
-    teacher: "Mike Chen",
-    level: "Intermediate",
-    duration: "12 weeks",
-    price: "$399",
-    students: 32,
-    maxStudents: 40,
-    nextSession: "2024-01-16T14:00:00",
-    meetingLink: "https://zoom.us/j/987654321",
-    status: "Active",
-    poster:
-      "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=1400&auto=format&fit=crop",
-    color: "from-cyan-500 to-blue-600",
-    sessions: 24,
-    completedSessions: 8,
-    schedule: "Tue, Thu - 2:00 PM",
-    timezone: "EST",
-  },
-  {
-    id: 3,
-    title: "Python for Data Science",
-    description:
-      "Live data science workshop with Python, covering pandas, numpy, and machine learning basics.",
-    teacher: "Dr. Emily Davis",
-    level: "Beginner",
-    duration: "10 weeks",
-    price: "$349",
-    students: 28,
-    maxStudents: 35,
-    nextSession: "2024-01-17T16:00:00",
-    meetingLink: "https://zoom.us/j/456789123",
-    status: "Active",
-    poster:
-      "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?q=80&w=1400&auto=format&fit=crop",
-    color: "from-green-500 to-teal-600",
-    sessions: 20,
-    completedSessions: 12,
-    schedule: "Sat, Sun - 4:00 PM",
-    timezone: "EST",
-  },
-  {
-    id: 4,
-    title: "UI/UX Design Workshop",
-    description:
-      "Interactive design sessions focusing on user experience, prototyping, and design thinking.",
-    teacher: "Alex Rivera",
-    level: "Intermediate",
-    duration: "6 weeks",
-    price: "$249",
-    students: 22,
-    maxStudents: 25,
-    nextSession: "2024-01-18T11:00:00",
-    meetingLink: "https://zoom.us/j/789123456",
-    status: "Active",
-    poster:
-      "https://images.unsplash.com/photo-1561070791-2526d30994b5?q=80&w=1400&auto=format&fit=crop",
-    color: "from-pink-500 to-red-600",
-    sessions: 12,
-    completedSessions: 4,
-    schedule: "Mon, Wed - 11:00 AM",
-    timezone: "EST",
-  },
-  {
-    id: 5,
-    title: "Digital Marketing Strategy",
-    description:
-      "Live sessions on modern digital marketing, social media strategies, and analytics.",
-    teacher: "Lisa Thompson",
-    level: "Beginner",
-    duration: "8 weeks",
-    price: "$199",
-    students: 38,
-    maxStudents: 45,
-    nextSession: "2024-01-19T13:00:00",
-    meetingLink: "https://zoom.us/j/321654987",
-    status: "Active",
-    poster:
-      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1400&auto=format&fit=crop",
-    color: "from-orange-500 to-yellow-600",
-    sessions: 16,
-    completedSessions: 10,
-    schedule: "Fri - 1:00 PM",
-    timezone: "EST",
-  },
-  {
-    id: 6,
-    title: "Cybersecurity Fundamentals",
-    description:
-      "Live cybersecurity training covering threat analysis, network security, and ethical hacking.",
-    teacher: "Robert Kim",
-    level: "Advanced",
-    duration: "14 weeks",
-    price: "$449",
-    students: 15,
-    maxStudents: 20,
-    nextSession: "2024-01-20T09:00:00",
-    meetingLink: "https://zoom.us/j/654987321",
-    status: "Active",
-    poster:
-      "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1400&auto=format&fit=crop",
-    color: "from-red-500 to-purple-600",
-    sessions: 28,
-    completedSessions: 16,
-    schedule: "Tue, Thu, Sat - 9:00 AM",
-    timezone: "EST",
-  },
-];
+import { message, Spin } from "antd";
+import axios from "axios";
+import { BASE_URL } from "../../utils/base_url";
 
 export default function LiveCoursesPage() {
   const router = useRouter();
 
-  const [data, setData] = useState(liveCourses);
+  const token = localStorage.getItem("AccessToken");
+
+  console.log(token, "token ");
+
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Fetch courses from API
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  const fetchCourses = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/courses/select_live_courses.php`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("AccessToken")}`,
+          },
+        }
+      );
+
+      if (response?.data.status === "success") {
+        // Transform API data to match UI structure
+        const transformedData = response?.data.message.map((course) => ({
+          id: course.course_id,
+          title: course.course_name,
+          description: course.course_descreption,
+          overview: course.overview,
+          type: course.type,
+          level: capitalizeFirst(course.level),
+          duration: course.Duration,
+          lessons: parseInt(course.lessons) || 0,
+          groupPrice: course.group_price,
+          privatePrice: course.private_price,
+          poster: course.image,
+          video: course.video,
+          advertisingVideo: course.advertising_video,
+          willLearn: course.wiil_learn?.split("**CAMP**") || [],
+          features: course.feature?.split("**CAMP**") || [],
+          createdAt: course.created_at,
+          hidden: course.hidden === "1",
+          // Computed fields for UI
+          status: course.hidden === "0" ? "Active" : "Inactive",
+          price: `$${course.group_price}`,
+          sessions: parseInt(course.lessons) || 0,
+          // maxStudents: 50, // Default value, update if API provides this
+          // students: 30, // Default value, update if API provides this
+          // teacher: "Instructor", // Default, update if API provides
+          timezone: "EST",
+          nextSession: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+          color: getRandomColor(),
+        }));
+        setData(transformedData);
+      } else {
+        message.error("Failed to fetch courses");
+      }
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      message.error("Failed to fetch courses. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const capitalizeFirst = (str) => {
+    if (!str) return "";
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  };
+
+  const getRandomColor = () => {
+    const colors = [
+      "from-blue-500 to-purple-600",
+      "from-cyan-500 to-blue-600",
+      "from-green-500 to-teal-600",
+      "from-pink-500 to-red-600",
+      "from-orange-500 to-yellow-600",
+      "from-red-500 to-purple-600",
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
 
   const filtered = useMemo(() => {
     const q = (searchTerm || "").trim().toLowerCase();
@@ -157,19 +108,45 @@ export default function LiveCoursesPage() {
       (c) =>
         c?.title?.toLowerCase().includes(q) ||
         c?.description?.toLowerCase().includes(q) ||
-        c?.teacher?.toLowerCase().includes(q) ||
+        // c?.teacher?.toLowerCase().includes(q) ||
         c?.level?.toLowerCase().includes(q) ||
         c?.status?.toLowerCase().includes(q)
     );
   }, [data, searchTerm]);
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!selectedCourse) return;
-    setData((prev) =>
-      prev.filter((c) => String(c.id) !== String(selectedCourse.id))
-    );
-    setOpenDeleteModal(false);
-    setSelectedCourse(null);
+
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`${BASE_URL}/delete_course.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          course_id: selectedCourse.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.status === "success") {
+        setData((prev) =>
+          prev.filter((c) => String(c.id) !== String(selectedCourse.id))
+        );
+        message.success("Course deleted successfully");
+      } else {
+        message.error(result.message || "Failed to delete course");
+      }
+    } catch (error) {
+      console.error("Error deleting course:", error);
+      message.error("Failed to delete course. Please try again.");
+    } finally {
+      setDeleteLoading(false);
+      setOpenDeleteModal(false);
+      setSelectedCourse(null);
+    }
   }
 
   const formatNextSession = (dateString) => {
@@ -182,9 +159,16 @@ export default function LiveCoursesPage() {
     });
   };
 
-  const getProgressPercentage = (completed, total) => {
-    return Math.round((completed / total) * 100);
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <BreadCrumb title="Live Courses" child="Live Courses" parent="Home" />
+        <div className="flex items-center justify-center h-64">
+          <Spin size="large" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -242,7 +226,7 @@ export default function LiveCoursesPage() {
             <div>
               <p className="text-sm text-slate-600">Total Students</p>
               <p className="text-xl font-semibold">
-                {data.reduce((sum, c) => sum + c.students, 0)}
+                {data.reduce((sum, c) => sum + (c.students || 0), 0)}
               </p>
             </div>
           </div>
@@ -253,9 +237,9 @@ export default function LiveCoursesPage() {
               <Clock className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm text-slate-600">Live Sessions</p>
+              <p className="text-sm text-slate-600">Total Lessons</p>
               <p className="text-xl font-semibold">
-                {data.reduce((sum, c) => sum + c.sessions, 0)}
+                {data.reduce((sum, c) => sum + (c.lessons || 0), 0)}
               </p>
             </div>
           </div>
@@ -273,13 +257,20 @@ export default function LiveCoursesPage() {
             <div className="pointer-events-none absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-gradient-to-br from-[var(--primary-color)] via-[var(--secondary-color)] to-[var(--accent-color)] blur-2xl opacity-60" />
             <div className="pointer-events-none absolute -right-10 bottom-20 h-24 w-24 rounded-full bg-gradient-to-br from-[var(--primary-color)] via-[var(--secondary-color)] to-[var(--accent-color)] blur-2xl opacity-60" />
 
-            {/* Media - No Video, Just Image */}
+            {/* Media */}
             <div className="relative h-44 overflow-hidden">
               <img
-                src={c.poster}
+                src={
+                  c.poster ||
+                  "https://via.placeholder.com/400x200?text=No+Image"
+                }
                 alt={c.title}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 loading="lazy"
+                onError={(e) => {
+                  e.target.src =
+                    "https://via.placeholder.com/400x200?text=No+Image";
+                }}
               />
               <div
                 className={`absolute inset-0 bg-gradient-to-r ${c.color} opacity-25`}
@@ -299,7 +290,7 @@ export default function LiveCoursesPage() {
               </div>
 
               {/* Badges */}
-              <div className="absolute top-3 left-3 flex gap-2">
+              <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
                 <span className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200">
                   {c.level}
                 </span>
@@ -307,29 +298,8 @@ export default function LiveCoursesPage() {
                   {c.duration}
                 </span>
                 <span className="text-[11px] rounded-full bg-white/90 px-2 py-1 ring-1 ring-slate-200">
-                  {c.students}/{c.maxStudents} students
+                  {c.lessons} lessons
                 </span>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="absolute bottom-0 left-0 right-0 bg-black/20 p-3">
-                <div className="flex items-center justify-between text-white text-xs mb-1">
-                  <span>Progress</span>
-                  <span>
-                    {getProgressPercentage(c.completedSessions, c.sessions)}%
-                  </span>
-                </div>
-                <div className="w-full bg-white/20 rounded-full h-1.5">
-                  <div
-                    className="bg-white h-1.5 rounded-full transition-all duration-300"
-                    style={{
-                      width: `${getProgressPercentage(
-                        c.completedSessions,
-                        c.sessions
-                      )}%`,
-                    }}
-                  ></div>
-                </div>
               </div>
             </div>
 
@@ -342,45 +312,34 @@ export default function LiveCoursesPage() {
                 {c.description}
               </p>
 
-              {/* Next Session Info */}
+              {/* Price Info */}
               <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                  <span className="text-blue-800 font-medium">
-                    Next Session:
-                  </span>
-                  <span className="text-blue-700">
-                    {formatNextSession(c.nextSession)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-blue-600 mt-1">
-                  <Clock className="w-3 h-3" />
-                  <span>{c.schedule}</span>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <span className="text-blue-800 font-medium">Group:</span>
+                    <span className="text-blue-700">${c.groupPrice}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-800 font-medium">Private:</span>
+                    <span className="text-blue-700">${c.privatePrice}</span>
+                  </div>
                 </div>
               </div>
 
               <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
                 <div className="flex items-center gap-3">
                   <span
-                    title="Sessions"
+                    title="Lessons"
                     className="inline-flex items-center gap-1"
                   >
                     <Video className="h-4 w-4" />
-                    {c.completedSessions}/{c.sessions}
+                    {c.lessons} lessons
                   </span>
-                  <span className="inline-flex items-center gap-1">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4">
-                      <path
-                        fill="currentColor"
-                        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z"
-                      />
-                    </svg>
-                    {c.teacher}
+                  <span className="inline-flex items-center gap-1 capitalize">
+                    {c.type}
                   </span>
                 </div>
-                <span className="font-semibold text-[var(--text-color)]">
-                  {c.price}
-                </span>
               </div>
 
               {/* Actions */}
@@ -454,6 +413,7 @@ export default function LiveCoursesPage() {
         }
         open={openDeleteModal}
         setOpen={setOpenDeleteModal}
+        loading={deleteLoading}
       />
     </div>
   );

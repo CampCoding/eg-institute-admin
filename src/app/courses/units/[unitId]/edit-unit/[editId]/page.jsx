@@ -10,9 +10,9 @@ import { BASE_URL } from "../../../../../../utils/base_url";
 import toast from "react-hot-toast";
 
 export default function EditUnitPage() {
-  const { editId  , unitId} = useParams();
+  const { editId, unitId } = useParams();
   const router = useRouter();
-  const [openDeleteModal , setOpenDeleteModal] = useState(false);
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
 
   const [course, setCourse] = useState(
     courses?.find((c) => c.id === parseInt(unitId))
@@ -24,7 +24,7 @@ export default function EditUnitPage() {
     videos: [""],
     pdfs: [""],
   });
- 
+
   const handleInputChange = (e, field) => {
     const { value } = e.target;
     setUnit((prevUnit) => ({ ...prevUnit, [field]: value }));
@@ -54,32 +54,38 @@ export default function EditUnitPage() {
     const updatedPdfs = unit.pdfs.filter((_, i) => i !== index);
     setUnit((prevUnit) => ({ ...prevUnit, pdfs: updatedPdfs }));
   };
- 
 
+  const [selectedUnit, setSelectedUnit] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [selectedUnit , setSelectedUnit] = useState({});
-  const [isLoading,  setIsLoading] = useState(false);
-  
   useEffect(() => {
     const token = localStorage.getItem("AccessToken");
-    axios.post(BASE_URL+"/units/select_course_units.php",{course_id : unitId},{
-      headers : {
-        "Authorization" :`Bearer ${token}`
-      }
-    }).then(res => {
-      if(res?.data?.status == "success") {
-        const filtered = res?.data?.message?.find(item => item?.unit_id == unitId);
-        setUnit({name:  filtered?.unit_title})
-        setSelectedUnit(filtered);
-      }
-    })
-  } , [unitId])
+    axios
+      .post(
+        BASE_URL + "/units/select_course_units.php",
+        { course_id: unitId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+      .then((res) => {
+        if (res?.data?.status == "success") {
+          const filtered = res?.data?.message?.find(
+            (item) => item?.unit_id == unitId
+          );
+          setUnit({ name: filtered?.unit_title });
+          setSelectedUnit(filtered);
+        }
+      });
+  }, [unitId]);
 
   useEffect(() => {
     setUnit({
-      name:  selectedUnit?.unit_title
-    })
-  } , [selectedUnit])
+      name: selectedUnit?.unit_title,
+    });
+  }, [selectedUnit]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -91,29 +97,28 @@ export default function EditUnitPage() {
       return;
     }
     const data_send = {
-      unit_title : unit?.name,
-      unit_id : editId,
-      
-    }
+      unit_title: unit?.name,
+      unit_id: editId,
+    };
     setIsLoading(true);
-    axios.post(BASE_URL+"/units/edit_unit.php",data_send , {
-      headers : {
-        "Authorization":`Bearer ${token}`
-      }
-    })
-    .then(res => {
-      if(res?.data?.status == "success") {
-        toast.success(res?.data?.message);
-        router.push(`/courses/units/${unitId}`)
-        setUnit({name:""});
-      }else {
-        toast.error(res?.data?.message);
-      }
-    }).catch(e => console.log(e))
-    .finally(() => setIsLoading(false))
+    axios
+      .post(BASE_URL + "/units/edit_unit.php", data_send, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => {
+        if (res?.data?.status == "success") {
+          toast.success(res?.data?.message);
+          router.push(`/courses/units/${unitId}`);
+          setUnit({ name: "" });
+        } else {
+          toast.error(res?.data?.message);
+        }
+      })
+      .catch((e) => console.log(e))
+      .finally(() => setIsLoading(false));
   };
-
-  
 
   return (
     <div className="min-h-screen">
@@ -147,6 +152,7 @@ export default function EditUnitPage() {
             <label className="text-sm font-medium">Lessons Count</label>
             <input
               type="number"
+onWheel={(e) => e.target.blur()}
               value={unit.lessonsCount}
               onChange={(e) => handleInputChange(e, "lessonsCount")}
               min={1}
@@ -222,10 +228,15 @@ export default function EditUnitPage() {
             type="submit"
             className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] !text-white px-4 py-2 font-medium hover:opacity-90"
           >
-           {isLoading ?"Loading...." : <div className="flex gap-1 items-center"> <Save size={18} />
-            Save Unit
-            </div> }
-            
+            {isLoading ? (
+              "Loading...."
+            ) : (
+              <div className="flex gap-1 items-center">
+                {" "}
+                <Save size={18} />
+                Save Unit
+              </div>
+            )}
           </button>
           <button
             type="button"

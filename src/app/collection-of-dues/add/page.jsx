@@ -12,8 +12,8 @@ const TEACHERS = [
 ];
 
 export default function page() {
-    const router = useRouter();
-    const [showForm, setShowForm] = useState(true);
+  const router = useRouter();
+  const [showForm, setShowForm] = useState(true);
 
   // Form state
   const [form, setForm] = useState({
@@ -51,9 +51,12 @@ export default function page() {
   const validate = () => {
     const e = {};
     if (!form.payerType) e.payerType = "Please choose payer type.";
-    if (form.payerType === "Teacher" && !form.teacherId) e.teacherId = "Please select a teacher.";
-    if (form.payerType === "Student" && !form.studentName.trim()) e.studentName = "Please enter student name.";
-    if (!form.amount || Number(form.amount) <= 0) e.amount = "Enter a valid amount.";
+    if (form.payerType === "Teacher" && !form.teacherId)
+      e.teacherId = "Please select a teacher.";
+    if (form.payerType === "Student" && !form.studentName.trim())
+      e.studentName = "Please enter student name.";
+    if (!form.amount || Number(form.amount) <= 0)
+      e.amount = "Enter a valid amount.";
     if (!form.date) e.date = "Choose date & time.";
     return e;
   };
@@ -68,7 +71,8 @@ export default function page() {
     const payload = {
       payerType: form.payerType,
       teacherId: form.payerType === "Teacher" ? form.teacherId : null,
-      studentName: form.payerType === "Student" ? form.studentName.trim() : null,
+      studentName:
+        form.payerType === "Student" ? form.studentName.trim() : null,
       amount: Number(form.amount),
       date: new Date(form.date).toISOString(),
       notes: form.notes.trim() || null,
@@ -84,7 +88,7 @@ export default function page() {
 
   return (
     <div className="min-h-screen">
-        <div className="flex mb-4 items-center gap-2">
+      <div className="flex mb-4 items-center gap-2">
         <button
           type="button"
           onClick={() => router.back()}
@@ -99,14 +103,18 @@ export default function page() {
 
       <div className="mt-5 w-full gap-6">
         {/* Left column: the form */}
-        <div className={`${showForm ? "block" : "hidden lg:block"} lg:col-span-2`}>
+        <div
+          className={`${showForm ? "block" : "hidden lg:block"} lg:col-span-2`}
+        >
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 bg-green-100 rounded-xl flex items-center justify-center">
                   <Plus className="h-5 w-5 text-green-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Add Receivable</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Add Receivable
+                </h3>
               </div>
               {showForm && (
                 <button
@@ -121,7 +129,9 @@ export default function page() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Payer Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Payer Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Payer Type
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                   {["Teacher", "Student"].map((type) => (
                     <button
@@ -139,17 +149,23 @@ export default function page() {
                   ))}
                 </div>
                 {errors.payerType && (
-                  <p className="text-red-500 text-xs mt-1">{errors.payerType}</p>
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.payerType}
+                  </p>
                 )}
               </div>
 
               {/* Teacher / Student fields */}
               {form.payerType === "Teacher" ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Teacher</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Teacher
+                  </label>
                   <select
                     value={form.teacherId}
-                    onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, teacherId: e.target.value })
+                    }
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Select teacher...</option>
@@ -160,21 +176,29 @@ export default function page() {
                     ))}
                   </select>
                   {errors.teacherId && (
-                    <p className="text-red-500 text-xs mt-1">{errors.teacherId}</p>
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.teacherId}
+                    </p>
                   )}
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Student Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Student Name
+                  </label>
                   <input
                     type="text"
                     value={form.studentName}
-                    onChange={(e) => setForm({ ...form, studentName: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, studentName: e.target.value })
+                    }
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter student name..."
                   />
                   {errors.studentName && (
-                    <p className="text-red-500 text-xs mt-1">{errors.studentName}</p>
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.studentName}
+                    </p>
                   )}
                 </div>
               )}
@@ -182,17 +206,23 @@ export default function page() {
               {/* Amount + Date */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Amount
+                  </label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                       type="number"
+                      onWheel={(e) => e.target.blur()}
                       min="0"
                       step="0.01"
                       value={form.amount}
-                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, amount: e.target.value })
+                      }
                       className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="0.00"
+                      onWheel={(e) => e.target.blur()}
                     />
                   </div>
                   {errors.amount && (
@@ -201,7 +231,9 @@ export default function page() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Date & Time</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Date & Time
+                  </label>
                   <input
                     type="datetime-local"
                     value={form.date}
@@ -216,7 +248,9 @@ export default function page() {
 
               {/* Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notes
+                </label>
                 <textarea
                   rows={3}
                   value={form.notes}
@@ -248,7 +282,6 @@ export default function page() {
         </div>
 
         {/* Right column: helper/preview */}
-        
       </div>
     </div>
   );

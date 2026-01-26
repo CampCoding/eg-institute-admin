@@ -342,6 +342,7 @@ export default function AddCoursePage() {
                   <label className={labelClass}> Group Price ($)</label>
                   <input
                     type="number"
+                    onWheel={(e) => e.target.blur()}
                     min="0"
                     step="0.01"
                     {...register("g_price")}
@@ -357,6 +358,7 @@ export default function AddCoursePage() {
                   <label className={labelClass}> Private Price ($)</label>
                   <input
                     type="number"
+                    onWheel={(e) => e.target.blur()}
                     min="0"
                     step="0.01"
                     {...register("p_price")}
@@ -372,6 +374,7 @@ export default function AddCoursePage() {
                   <label className={labelClass}>Lessons</label>
                   <input
                     type="number"
+                    onWheel={(e) => e.target.blur()}
                     min="1"
                     {...register("lessons")}
                     className={inputClass}

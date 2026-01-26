@@ -44,7 +44,6 @@ export default function TeachersPage() {
   }, [dispatch, teachers?.message]);
 
   const mappedTeachers = teachers?.message?.map((teacher) => ({
-    // ✅ نفس أسماء الأول زي ما هي
     id: teacher?.teacher_id,
     name: teacher?.teacher_name,
     title: teacher?.specialization,
@@ -58,8 +57,8 @@ export default function TeachersPage() {
             .map((t) => t.trim())
             .filter(Boolean)
         : Array.isArray(teacher?.tags)
-        ? teacher.tags
-        : [],
+          ? teacher.tags
+          : [],
     level: teacher?.level,
     rating: teacher?.rate,
     email: teacher?.teacher_email,
@@ -67,14 +66,16 @@ export default function TeachersPage() {
       teacher?.teacher_image ||
       "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=1400&auto=format&fit=crop",
 
-    // ✅ زوّد الناقص من object التاني (بنفس أسماء API)
+    // ✅ ADD VIDEO FIELD
+    video: teacher?.video || "",
 
+    // Additional API fields
     teacher_email: teacher?.teacher_email,
     phone: teacher?.phone,
     hourly_rate: teacher?.hourly_rate,
+    experience_hours: teacher?.experience_hours,
     teacher_image: teacher?.teacher_image,
     specialization: teacher?.specialization,
-    summary: teacher?.bio,
     rate: teacher?.rate,
     languages: teacher?.languages || [],
     time_zone: teacher?.time_zone || "",
@@ -195,15 +196,6 @@ export default function TeachersPage() {
                 <Star size={14} className="fill-amber-400 text-amber-400" />
                 {t?.rating}
               </div>
-
-              {/* Middle-right chevron button */}
-              <button
-                onClick={() => router.push(`/teachers/profile/${t.id}`)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 size-9 grid place-items-center rounded-full bg-teal-600 text-white shadow-md hover:bg-teal-700"
-                aria-label="Open teacher"
-              >
-                <ChevronRight size={18} />
-              </button>
             </div>
 
             {/* Body */}
@@ -213,7 +205,7 @@ export default function TeachersPage() {
                 {t.title}
               </p>
 
-              <p className="mt-3 text-slate-600 text-sm leading-relaxed">
+              <p className="mt-3 text-slate-600 text-sm leading-relaxed line-clamp-1">
                 {t.summary}
               </p>
 

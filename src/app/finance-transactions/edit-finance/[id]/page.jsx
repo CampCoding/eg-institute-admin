@@ -1,12 +1,18 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import { DollarSign, Calendar, FileText, CheckCircle, ArrowLeft } from "lucide-react";
+import {
+  DollarSign,
+  Calendar,
+  FileText,
+  CheckCircle,
+  ArrowLeft,
+} from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { finance_transactions } from "@/utils/data";
 
 export default function EditFinanceTransactionPage() {
-    const {id} = useParams();
+  const { id } = useParams();
   const [formData, setFormData] = useState({
     date: "",
     description: "",
@@ -14,8 +20,8 @@ export default function EditFinanceTransactionPage() {
     amount: "",
     status: "completed",
   });
-  const [rowData , setRowData] = useState({});
-  const  router = useRouter();
+  const [rowData, setRowData] = useState({});
+  const router = useRouter();
   const handleChange = (e) => {
     setRowData({
       ...rowData,
@@ -30,14 +36,14 @@ export default function EditFinanceTransactionPage() {
   };
 
   useEffect(() => {
-     if(id) {
-        setRowData(finance_transactions?.find(item => item?.id == id));
-     }
-  }  , [id] )
+    if (id) {
+      setRowData(finance_transactions?.find((item) => item?.id == id));
+    }
+  }, [id]);
 
   return (
     <div className="min-h-screen">
-         <div className="flex mb-4 items-center gap-2">
+      <div className="flex mb-4 items-center gap-2">
         <button
           type="button"
           onClick={() => router.back()}
@@ -48,16 +54,24 @@ export default function EditFinanceTransactionPage() {
         </button>
       </div>
 
-      <BreadCrumb title={"Edit Finance Transaction"} parent={"Finance"} child={"Edit Transaction"} />
+      <BreadCrumb
+        title={"Edit Finance Transaction"}
+        parent={"Finance"}
+        child={"Edit Transaction"}
+      />
 
       <div className="mt-5 px-2 sm:px-4 bg-white rounded-2xl">
-
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Date
+            </label>
             <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Calendar
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
               <input
                 type="date"
                 name="date"
@@ -71,9 +85,14 @@ export default function EditFinanceTransactionPage() {
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
             <div className="relative">
-              <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <FileText
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
               <input
                 type="text"
                 name="description"
@@ -88,7 +107,9 @@ export default function EditFinanceTransactionPage() {
 
           {/* Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type
+            </label>
             <select
               name="type"
               value={rowData.type}
@@ -103,11 +124,17 @@ export default function EditFinanceTransactionPage() {
 
           {/* Amount */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Amount ($)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Amount ($)
+            </label>
             <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <DollarSign
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
               <input
                 type="number"
+                onWheel={(e) => e.target.blur()}
                 name="amount"
                 value={rowData.amount}
                 onChange={handleChange}
@@ -120,7 +147,9 @@ export default function EditFinanceTransactionPage() {
 
           {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
             <select
               name="status"
               value={rowData.status}

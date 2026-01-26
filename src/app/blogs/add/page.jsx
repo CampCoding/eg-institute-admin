@@ -280,6 +280,10 @@ export default function AddBlogPage() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    console.log(form, "form");
+  }, [form]);
   return (
     <div className="min-h-screen mb-10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">

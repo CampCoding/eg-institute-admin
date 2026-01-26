@@ -72,7 +72,7 @@ export default function HomeSkills({ skillsData, chartPalette, completion }) {
                 <Legend
                   iconSize={10}
                   layout="vertical"
-                  verticalAlign="middle"
+                  verticalAlign="top"
                   align="right"
                 />
                 <Tooltip contentStyle={{ borderRadius: 12 }} />

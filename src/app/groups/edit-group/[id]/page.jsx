@@ -8,7 +8,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../../../../utils/base_url";
 
-const EDIT_GROUP_ENDPOINT = "/groups/edit_group.php"; // 👈 change if your file name is different
+const EDIT_GROUP_ENDPOINT = "/groups/edit_group.php";
 const SELECT_GROUPS_ENDPOINT = "/groups/select_groups.php";
 
 export default function Page() {
@@ -18,7 +18,6 @@ export default function Page() {
   const [addLoading, setAddLoading] = useState(false);
   const [loadingGroup, setLoadingGroup] = useState(true);
 
-  // ✅ same structure as Add Group
   const [formData, setFormData] = useState({
     group_name: "",
     group_type: "",
@@ -48,7 +47,6 @@ export default function Page() {
     "Friday",
   ];
 
-  // 🔹 time helper
   const parseTimeToMinutes = (timeStr) => {
     if (!timeStr) return null;
     const [hStr, mStr] = timeStr.split(":");
@@ -57,7 +55,6 @@ export default function Page() {
     return h * 60 + m;
   };
 
-  // 🔹 check schedule inside teacher slots
   const isScheduleWithinTeacherSlots = (schedule, teacher) => {
     if (!teacher || !Array.isArray(teacher.teacher_slots)) return true;
 
@@ -128,7 +125,7 @@ export default function Page() {
       .catch((err) => console.error(err));
   }
 
-  // 🔹 load existing group data by id
+  // ✅ Load existing group data
   async function handleGetGroupDetails() {
     const token = localStorage.getItem("AccessToken");
     setLoadingGroup(true);
@@ -140,9 +137,7 @@ export default function Page() {
 
       if (res?.data?.status === "success") {
         const list = res?.data?.message || [];
-        const found = list.find(
-          (g) => String(g.group_id) === String(id)
-        );
+        const found = list.find((g) => String(g.group_id) === String(id));
 
         if (!found) {
           toast.error("Group not found");
@@ -150,25 +145,28 @@ export default function Page() {
           return;
         }
 
-        // 🟢 map API → formData
+        console.log("Found Group:", found);
+
+        // ✅ Map API response to form data
         setFormData({
           group_name: found.group_name || "",
-          group_type: found.group_type || "",
+          group_type: found.type || "", // ⚠️ API returns "type" not "group_type"
           course_id: String(found.course_id || ""),
           teacher_id: String(found.teacher_id || ""),
           max_students: String(found.max_students || ""),
           start_date: found.start_date || "",
-          session_duration: found.session_duration || "",
+          session_duration: String(found.session_duration || ""),
           status: found.status || "active",
         });
 
-        // 🟢 map schedules if backend returns them
-        if (Array.isArray(found.schedules) && found.schedules.length > 0) {
+        // ✅ Map "slots" from API to "schedules" in form
+        // API returns "slots", but we use "schedules" in the form
+        if (Array.isArray(found.slots) && found.slots.length > 0) {
           setSchedules(
-            found.schedules.map((s) => ({
-              day_of_week: s.day_of_week || "",
-              start_time: s.start_time || "",
-              end_time: s.end_time || "",
+            found.slots.map((slot) => ({
+              day_of_week: slot.day_of_week || "",
+              start_time: slot.start_time?.slice(0, 5) || "", // Convert "16:00:00" to "16:00"
+              end_time: slot.end_time?.slice(0, 5) || "", // Convert "17:00:00" to "17:00"
             }))
           );
         } else {
@@ -196,7 +194,6 @@ export default function Page() {
     }
   }, [id]);
 
-  // 🔹 main form change
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -205,7 +202,6 @@ export default function Page() {
     }));
   };
 
-  // 🔹 schedule change
   const handleScheduleChange = (index, field, value) => {
     setSchedules((prev) => {
       const copy = [...prev];
@@ -228,7 +224,7 @@ export default function Page() {
     setSchedules((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // 🔴 EDIT SUBMIT
+  // ✅ SUBMIT HANDLER
   const handleSubmit = async (e) => {
     e.preventDefault();
     setAddLoading(true);
@@ -265,8 +261,9 @@ export default function Page() {
       return;
     }
 
+    // ✅ Prepare payload - NO "slots", only "schedules"
     const data_send = {
-      group_id: Number(id), // 👈 مهم عشان التعديل
+      group_id: Number(id),
       group_name: formData.group_name.trim(),
       group_type: formData.group_type?.trim(),
       course_id: Number(formData.course_id),
@@ -282,26 +279,26 @@ export default function Page() {
       })),
     };
 
+    console.log("Payload being sent:", data_send);
+
     try {
-      const res = await axios.post(
-        BASE_URL + EDIT_GROUP_ENDPOINT,
-        data_send,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await axios.post(BASE_URL + EDIT_GROUP_ENDPOINT, data_send, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log("Response:", res.data);
 
       if (res?.data?.status === "success") {
         toast.success(res?.data?.message || "Group updated successfully");
-        router.push("/groups"); // عدّل المسار حسب عندك
+        router.push("/groups");
       } else {
         toast.error(res?.data?.message || "Something went wrong");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Error while updating group");
+      toast.error(err?.response?.data?.message || "Error while updating group");
     }
 
     setAddLoading(false);
@@ -309,8 +306,11 @@ export default function Page() {
 
   if (loadingGroup) {
     return (
-      <div className="p-4">
-        <p className="text-sm text-slate-500">Loading group data...</p>
+      <div className="p-4 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-sm text-slate-500">Loading group data...</p>
+        </div>
       </div>
     );
   }
@@ -321,7 +321,7 @@ export default function Page() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+          className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
         >
           <ArrowLeft size={16} className="inline -mt-0.5 mr-1" />
           Back
@@ -334,12 +334,12 @@ export default function Page() {
         child={"Edit Group"}
       />
 
-      <div className="mt-5 bg-white rounded-2xl border border-slate-200 p-4">
+      <div className="mt-5 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Group Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Group Name
+              Group Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -348,14 +348,14 @@ export default function Page() {
               value={formData.group_name}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             />
           </div>
 
           {/* Group Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Group Type
+              Group Type <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.group_type}
@@ -365,7 +365,8 @@ export default function Page() {
                   group_type: e.target.value,
                 }))
               }
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              required
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             >
               <option value="">Choose Group Type</option>
               <option value="private">Private</option>
@@ -376,14 +377,14 @@ export default function Page() {
           {/* Course */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Course
+              Course <span className="text-red-500">*</span>
             </label>
             <select
               name="course_id"
               value={formData.course_id}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             >
               <option value="">Select course</option>
               {allCourses.map((course) => (
@@ -397,14 +398,14 @@ export default function Page() {
           {/* Teacher */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Teacher
+              Teacher <span className="text-red-500">*</span>
             </label>
             <select
               name="teacher_id"
               value={formData.teacher_id}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             >
               <option value="">Select teacher</option>
               {allTeachers.map((t) => (
@@ -418,24 +419,25 @@ export default function Page() {
           {/* Max Students */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Max Students
+              Max Students <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
+              onWheel={(e) => e.target.blur()}
               name="max_students"
               placeholder="Enter max students (e.g. 20)"
               value={formData.max_students}
               onChange={handleChange}
               min={1}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             />
           </div>
 
           {/* Start Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date
+              Start Date <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -443,59 +445,59 @@ export default function Page() {
               value={formData.start_date}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             />
           </div>
 
           {/* Session Duration */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Session Duration
+              Session Duration (minutes) <span className="text-red-500">*</span>
             </label>
             <input
-              type="text"
+              type="number"
               name="session_duration"
-              placeholder="e.g. 90 minutes"
+              placeholder="e.g. 90"
               value={formData.session_duration}
               onChange={handleChange}
+              min={1}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             />
           </div>
 
           {/* Status */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Status
+              Status <span className="text-red-500">*</span>
             </label>
             <select
               name="status"
               value={formData.status}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             >
               {statuses.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
                 </option>
               ))}
             </select>
           </div>
 
           {/* Schedules */}
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              Schedules
+              Schedules <span className="text-red-500">*</span>
             </label>
 
             <div className="space-y-3">
               {schedules.map((schedule, index) => (
                 <div
                   key={index}
-                  className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end border border-slate-200 rounded-lg p-3"
+                  className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end border border-slate-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
-                  {/* Day of Week */}
                   <div>
                     <span className="block text-xs font-medium text-gray-600 mb-1">
                       Day of Week
@@ -509,7 +511,7 @@ export default function Page() {
                           e.target.value
                         )
                       }
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[--primary-color] outline-none"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     >
                       <option value="">Select day</option>
                       {daysOfWeek.map((day) => (
@@ -520,7 +522,6 @@ export default function Page() {
                     </select>
                   </div>
 
-                  {/* Start Time */}
                   <div>
                     <span className="block text-xs font-medium text-gray-600 mb-1">
                       Start Time
@@ -535,11 +536,10 @@ export default function Page() {
                           e.target.value
                         )
                       }
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[--primary-color] outline-none"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     />
                   </div>
 
-                  {/* End Time */}
                   <div>
                     <span className="block text-xs font-medium text-gray-600 mb-1">
                       End Time
@@ -550,17 +550,16 @@ export default function Page() {
                       onChange={(e) =>
                         handleScheduleChange(index, "end_time", e.target.value)
                       }
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[--primary-color] outline-none"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     />
                   </div>
 
-                  {/* Remove Button */}
                   <div className="flex md:justify-end">
                     {schedules.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeScheduleRow(index)}
-                        className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100"
+                        className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                       >
                         <Trash2 size={14} />
                         Remove
@@ -574,28 +573,53 @@ export default function Page() {
             <button
               type="button"
               onClick={addScheduleRow}
-              className="mt-3 inline-flex items-center gap-1 px-3 py-2 text-xs rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"
+              className="mt-3 inline-flex items-center gap-1 px-4 py-2 text-sm rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium"
             >
-              <Plus size={14} />
+              <Plus size={16} />
               Add another schedule
             </button>
-          </div>
+          </div> */}
 
           {/* Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-6 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all"
+              className="px-6 py-2.5 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={addLoading}
-              className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all disabled:opacity-60"
+              className="px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed font-medium"
             >
-              {addLoading ? "Saving..." : "Update Group"}
+              {addLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg
+                    className="animate-spin h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Saving...
+                </span>
+              ) : (
+                "Update Group"
+              )}
             </button>
           </div>
         </form>

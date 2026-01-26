@@ -408,7 +408,7 @@ const links = [
 
   {
     id: 2,
-    label: "Users",
+    label: "Students",
     icon: Users2,
     href: "/students",
     children: [

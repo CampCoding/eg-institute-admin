@@ -12,7 +12,7 @@ import toast from "react-hot-toast";
 export default function AddUnitPage() {
   const { unitId } = useParams();
   const router = useRouter();
-  const [openDeleteModal , setOpenDeleteModal] = useState(false);
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
 
   const [course, setCourse] = useState(
     courses?.find((c) => c.id === parseInt(unitId))
@@ -55,7 +55,7 @@ export default function AddUnitPage() {
     setUnit((prevUnit) => ({ ...prevUnit, pdfs: updatedPdfs }));
   };
 
-  const [isLoading,  setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const handleSubmit = (e) => {
     e.preventDefault();
     const token = localStorage.getItem("AccessToken");
@@ -66,28 +66,28 @@ export default function AddUnitPage() {
       return;
     }
     const data_send = {
-      unit_title : unit?.name,
-      course_id : unitId
-    }
+      unit_title: unit?.name,
+      course_id: unitId,
+    };
     setIsLoading(true);
-    axios.post(BASE_URL+"/units/add_unit.php",data_send , {
-      headers : {
-        "Authorization":`Bearer ${token}`
-      }
-    })
-    .then(res => {
-      if(res?.data?.status == "success") {
-        toast.success(res?.data?.message);
-        router.push(`/courses/units/${unitId}`)
-        setUnit({name:""})
-      }else {
-        toast.error(res?.data?.message);
-      }
-    }).catch(e => console.log(e))
-    .finally(() => setIsLoading(false))
+    axios
+      .post(BASE_URL + "/units/add_unit.php", data_send, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => {
+        if (res?.data?.status == "success") {
+          toast.success(res?.data?.message);
+          router.push(`/courses/units/${unitId}`);
+          setUnit({ name: "" });
+        } else {
+          toast.error(res?.data?.message);
+        }
+      })
+      .catch((e) => console.log(e))
+      .finally(() => setIsLoading(false));
   };
-
-  
 
   return (
     <div className="min-h-screen">
@@ -121,6 +121,7 @@ export default function AddUnitPage() {
             <label className="text-sm font-medium">Lessons Count</label>
             <input
               type="number"
+onWheel={(e) => e.target.blur()}
               value={unit.lessonsCount}
               onChange={(e) => handleInputChange(e, "lessonsCount")}
               min={1}
@@ -196,10 +197,15 @@ export default function AddUnitPage() {
             type="submit"
             className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-4 py-2 font-medium hover:opacity-90"
           >
-           {isLoading ?"Loading...." : <div className="flex gap-1 items-center"> <Save size={18} />
-            Save Unit
-            </div> }
-            
+            {isLoading ? (
+              "Loading...."
+            ) : (
+              <div className="flex gap-1 items-center">
+                {" "}
+                <Save size={18} />
+                Save Unit
+              </div>
+            )}
           </button>
           <button
             type="button"

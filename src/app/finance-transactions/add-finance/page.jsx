@@ -1,11 +1,17 @@
 "use client";
 import React, { useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import { DollarSign, Calendar, FileText, CheckCircle, ArrowLeft } from "lucide-react";
+import {
+  DollarSign,
+  Calendar,
+  FileText,
+  CheckCircle,
+  ArrowLeft,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function AddFinanceTransactionPage() {
-    const router = useRouter();
+  const router = useRouter();
   const [formData, setFormData] = useState({
     date: "",
     description: "",
@@ -29,7 +35,7 @@ export default function AddFinanceTransactionPage() {
 
   return (
     <div className="min-h-screen p-4 sm:p-6 lg:p-8">
-        <div className="flex mb-4 items-center gap-2">
+      <div className="flex mb-4 items-center gap-2">
         <button
           type="button"
           onClick={() => router.back()}
@@ -40,16 +46,24 @@ export default function AddFinanceTransactionPage() {
         </button>
       </div>
 
-      <BreadCrumb title={"Add Finance Transaction"} parent={"Finance"} child={"Add Transaction"} />
+      <BreadCrumb
+        title={"Add Finance Transaction"}
+        parent={"Finance"}
+        child={"Add Transaction"}
+      />
 
       <div className="mt-5 px-2 sm:px-4 bg-white rounded-2xl">
-
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Date
+            </label>
             <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Calendar
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
               <input
                 type="date"
                 name="date"
@@ -63,9 +77,14 @@ export default function AddFinanceTransactionPage() {
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
             <div className="relative">
-              <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <FileText
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
               <input
                 type="text"
                 name="description"
@@ -80,7 +99,9 @@ export default function AddFinanceTransactionPage() {
 
           {/* Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type
+            </label>
             <select
               name="type"
               value={formData.type}
@@ -95,11 +116,17 @@ export default function AddFinanceTransactionPage() {
 
           {/* Amount */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Amount ($)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Amount ($)
+            </label>
             <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <DollarSign
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
               <input
                 type="number"
+                onWheel={(e) => e.target.blur()}
                 name="amount"
                 value={formData.amount}
                 onChange={handleChange}
@@ -112,7 +139,9 @@ export default function AddFinanceTransactionPage() {
 
           {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
             <select
               name="status"
               value={formData.status}

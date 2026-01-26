@@ -6,9 +6,10 @@
   --secondary-color: #c9ae6c;
   --accent-color: #4ade80;
   --background-color: #f3f4f6;
-  
 }
 
+button {
+}
 body {
   background: var(--background-color);
   font-family: Arial, Helvetica, sans-serif;
@@ -16,6 +17,11 @@ body {
 
 button {
   cursor: pointer;
+}
+
+button.bg-teal-600,
+button.text-white {
+  color: white !important;
 }
 
 html {

@@ -19,10 +19,13 @@ import {
   GlobalOutlined,
 } from "@ant-design/icons";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import { Tooltip } from "antd";
+import { Tooltip, message, Popconfirm } from "antd";
 import { useRouter } from "next/navigation";
 import useGetAllStudents from "../../utils/Api/GetAllStudents";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
+import axios from "axios";
+import { BASE_URL } from "../../utils/base_url";
+import toast from "react-hot-toast";
 
 export default function StudentsPage() {
   const router = useRouter();
@@ -32,10 +35,16 @@ export default function StudentsPage() {
   const [levelFilter, setLevelFilter] = useState("all");
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [viewMode, setViewMode] = useState("table"); // table or grid
+  const [deletingStudents, setDeletingStudents] = useState(new Set()); // Track which students are being deleted
 
-  
-  const { data, isLoading, isError } = useGetAllStudents();
+  const { data, isLoading, isError, refetch } = useGetAllStudents();
   console.log({ data, isLoading, isError });
+
+  // Get token from localStorage
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("AccessToken") || localStorage.getItem("token")
+      : null;
 
   const students = data?.message?.map((student) => {
     return {
@@ -55,112 +64,6 @@ export default function StudentsPage() {
   });
   console.log(students);
 
-  /*  const [students, setStudents] = useState([
-    {
-      id: 1,
-      name: "Sarah Johnson",
-      email: "sarah.johnson@email.com",
-      country: "United States",
-      timezone: "America/New_York",
-      password: "encrypted_password_1",
-      phone: "+1 234 567 8901",
-      group: "A",
-      level: "intermediate",
-      status: "Active",
-      enrollmentDate: "2023-09-15",
-      avatar: "https://i.pravatar.cc/100?img=1",
-    },
-    {
-      id: 2,
-      name: "Ahmed Al-Mansouri",
-      email: "ahmed.mansouri@email.com",
-      country: "UAE",
-      timezone: "Asia/Dubai",
-      password: "encrypted_password_2",
-      phone: "+971 50 123 4567",
-      group: "B",
-      level: "hard",
-      status: "Active",
-      enrollmentDate: "2023-09-12",
-      avatar: "https://i.pravatar.cc/100?img=2",
-    },
-    {
-      id: 3,
-      name: "Fatima Hassan",
-      email: "fatima.hassan@email.com",
-      country: "Egypt",
-      timezone: "Africa/Cairo",
-      password: "encrypted_password_3",
-      phone: "+20 100 123 4567",
-      group: "C",
-      level: "beginner",
-      status: "Inactive",
-      enrollmentDate: "2023-09-20",
-      avatar: "https://i.pravatar.cc/100?img=3",
-    },
-    {
-      id: 4,
-      name: "Alex Rodriguez",
-      email: "alex.rodriguez@email.com",
-      country: "Spain",
-      timezone: "Europe/Madrid",
-      password: "encrypted_password_4",
-      phone: "+34 612 345 678",
-      group: "A",
-      level: "hard",
-      status: "Active",
-      enrollmentDate: "2022-09-10",
-      avatar: "https://i.pravatar.cc/100?img=4",
-    },
-    {
-      id: 5,
-      name: "Yuki Tanaka",
-      email: "yuki.tanaka@email.com",
-      country: "Japan",
-      timezone: "Asia/Tokyo",
-      password: "encrypted_password_5",
-      phone: "+81 90 1234 5678",
-      group: "B",
-      level: "intermediate",
-      status: "Active",
-      enrollmentDate: "2023-09-18",
-      avatar: "https://i.pravatar.cc/100?img=5",
-    },
-    {
-      id: 6,
-      name: "Sophie Wilson",
-      email: "sophie.wilson@email.com",
-      country: "United Kingdom",
-      timezone: "Europe/London",
-      password: "encrypted_password_6",
-      phone: "+44 7700 900123",
-      group: "C",
-      level: "beginner",
-      status: "Active",
-      enrollmentDate: "2023-10-01",
-      avatar: "https://i.pravatar.cc/100?img=6",
-    },
-  ]); */
-
-  /*  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.country.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all"
-        ? true
-        : student.status.toLowerCase() === statusFilter.toLowerCase();
-
-    const matchesGroup =
-      groupFilter === "all" ? true : student.group === groupFilter;
-
-    const matchesLevel =
-      levelFilter === "all" ? true : student.level === levelFilter;
-
-    return matchesSearch && matchesStatus && matchesGroup && matchesLevel;
-  }); */
   const filteredStudents = students?.filter((student) => {
     const matchesSearch =
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -181,18 +84,121 @@ export default function StudentsPage() {
     return matchesSearch && matchesStatus && matchesGroup && matchesLevel;
   });
 
-  const handleDelete = (id) => {
-    setStudents((prev) => prev.filter((s) => s.id !== id));
-    alert("Student deleted successfully");
+  // Updated handleDelete function with API call
+  const handleDelete = async (studentId) => {
+    if (!token) {
+      toast.error("Authentication token not found. Please login again.");
+      return;
+    }
+
+    // Add student to deleting set to show loading state
+    setDeletingStudents((prev) => new Set([...prev, studentId]));
+
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/students/delete_student.php`,
+        {
+          student_id: studentId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 10000, // 10 seconds timeout
+        }
+      );
+
+      console.log("Delete response:", response.data);
+
+      if (response?.data?.status === "success") {
+        toast.success("Student deleted successfully!");
+
+        // Refetch the data to update the list
+        refetch();
+      } else {
+        toast.error(response?.data?.message || "Failed to delete student");
+      }
+    } catch (error) {
+      console.error("Error deleting student:", error);
+
+      if (error.response) {
+        // Server responded with error status
+        const errorMessage =
+          error.response.data?.message ||
+          `Server error: ${error.response.status}`;
+        toast.error(errorMessage);
+      } else if (error.request) {
+        // Request made but no response received
+        toast.error(
+          "Network error: Unable to connect to server. Please check your internet connection."
+        );
+      } else {
+        // Something else happened
+        toast.error("An unexpected error occurred while deleting the student.");
+      }
+    } finally {
+      // Remove student from deleting set
+      setDeletingStudents((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(studentId);
+        return newSet;
+      });
+    }
   };
 
-  const handleBulkAction = (action) => {
-    if (action === "delete") {
-      setStudents((prev) =>
-        prev.filter((s) => !selectedRowKeys.includes(s.id))
-      );
-      setSelectedRowKeys([]);
-      alert("Selected students deleted successfully");
+  // Updated handleBulkAction function
+  const handleBulkAction = async (action) => {
+    if (action === "delete" && selectedRowKeys.length > 0) {
+      if (!token) {
+        toast.error("Authentication token not found. Please login again.");
+        return;
+      }
+
+      try {
+        // Add all selected students to deleting set
+        setDeletingStudents((prev) => new Set([...prev, ...selectedRowKeys]));
+
+        // Delete students one by one (you could also create a bulk delete API)
+        const deletePromises = selectedRowKeys.map((studentId) =>
+          axios.post(
+            `${BASE_URL}/admin/students/delete_student.php`,
+            { student_id: studentId },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          )
+        );
+
+        const results = await Promise.allSettled(deletePromises);
+
+        const successCount = results.filter(
+          (result) =>
+            result.status === "fulfilled" &&
+            result.value?.data?.status === "success"
+        ).length;
+
+        const failCount = results.length - successCount;
+
+        if (successCount > 0) {
+          toast.success(`${successCount} student(s) deleted successfully!`);
+          refetch(); // Refresh the data
+          setSelectedRowKeys([]); // Clear selection
+        }
+
+        if (failCount > 0) {
+          toast.warning(`${failCount} student(s) could not be deleted.`);
+        }
+      } catch (error) {
+        console.error("Error in bulk delete:", error);
+        toast.error("An error occurred during bulk deletion.");
+      } finally {
+        // Clear deleting states
+        setDeletingStudents(new Set());
+      }
     }
   };
 
@@ -220,35 +226,36 @@ export default function StudentsPage() {
   const stats = [
     {
       title: "Total Students",
-      value: students?.length,
+      value: students?.length || 0,
       icon: UserOutlined,
       color: "bg-blue-500",
       change: "+12%",
     },
     {
       title: "Active Students",
-      value: students?.filter((s) => s.status === "Active").length,
+      value: students?.filter((s) => s.status === "Active").length || 0,
       icon: BookOutlined,
       color: "bg-green-500",
       change: "+8%",
     },
     {
       title: "Countries",
-      value: new Set(students?.map((s) => s.country)).size,
+      value: new Set(students?.map((s) => s.country)).size || 0,
       icon: GlobalOutlined,
       color: "bg-purple-500",
       change: "+2",
     },
     {
       title: "This Month",
-      value: students?.filter((s) => {
-        const enrollDate = new Date(s?.enrollmentDate);
-        const currentDate = new Date();
-        return (
-          enrollDate.getMonth() === currentDate.getMonth() &&
-          enrollDate.getFullYear() === currentDate.getFullYear()
-        );
-      }).length,
+      value:
+        students?.filter((s) => {
+          const enrollDate = new Date(s?.enrollmentDate);
+          const currentDate = new Date();
+          return (
+            enrollDate.getMonth() === currentDate.getMonth() &&
+            enrollDate.getFullYear() === currentDate.getFullYear()
+          );
+        }).length || 0,
       icon: CalendarOutlined,
       color: "bg-orange-500",
       change: "+3",
@@ -257,11 +264,36 @@ export default function StudentsPage() {
 
   const uniqueGroups = [...new Set(students?.map((s) => s.group))];
   const uniqueLevels = [...new Set(students?.map((s) => s.level))];
+
   if (isLoading) {
     return (
       <div className="min-h-screen grid place-items-center">
         <div className="inline-flex items-center gap-2 text-slate-600">
           <Loader2 className="animate-spin" /> Loading Students.....
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">
+            <UserOutlined className="text-4xl" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Error loading students
+          </h3>
+          <p className="text-gray-600 mb-4">
+            There was an error fetching the students data.
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -314,6 +346,27 @@ export default function StudentsPage() {
                 </p>
               </div>
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
+                {/* Bulk Actions */}
+                {selectedRowKeys.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">
+                      {selectedRowKeys.length} selected
+                    </span>
+                    <Popconfirm
+                      title="Delete selected students"
+                      description="Are you sure you want to delete the selected students? This action cannot be undone."
+                      onConfirm={() => handleBulkAction("delete")}
+                      okText="Yes, Delete"
+                      cancelText="Cancel"
+                      okButtonProps={{ danger: true }}
+                    >
+                      <button className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center gap-2">
+                        <Trash2 className="w-4 h-4" />
+                        Delete Selected
+                      </button>
+                    </Popconfirm>
+                  </div>
+                )}
                 <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2">
                   <DownloadOutlined />
                   Export
@@ -415,6 +468,25 @@ export default function StudentsPage() {
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                        <input
+                          type="checkbox"
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRowKeys(
+                                filteredStudents?.map((s) => s.id) || []
+                              );
+                            } else {
+                              setSelectedRowKeys([]);
+                            }
+                          }}
+                          checked={
+                            selectedRowKeys.length ===
+                              filteredStudents?.length &&
+                            filteredStudents?.length > 0
+                          }
+                        />
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-900">
                         Student
                       </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">
@@ -440,6 +512,24 @@ export default function StudentsPage() {
                         key={student.id}
                         className="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200"
                       >
+                        <td className="py-4 px-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedRowKeys.includes(student.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRowKeys((prev) => [
+                                  ...prev,
+                                  student.id,
+                                ]);
+                              } else {
+                                setSelectedRowKeys((prev) =>
+                                  prev.filter((id) => id !== student.id)
+                                );
+                              }
+                            }}
+                          />
+                        </td>
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
                             <img
@@ -515,30 +605,25 @@ export default function StudentsPage() {
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex gap-2">
-                            <Tooltip
-                              onClick={() =>
-                                router.push(`/students/profile/${student?.id}`)
-                              }
-                              title="Profile"
-                              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                            <Popconfirm
+                              title="Delete Student"
+                              description="Are you sure you want to delete this student? This action cannot be undone."
+                              onConfirm={() => handleDelete(student.id)}
+                              okText="Yes, Delete"
+                              cancelText="Cancel"
+                              okButtonProps={{ danger: true }}
                             >
-                              <EyeOutlined />
-                            </Tooltip>
-                            <Tooltip
-                              title="Edit"
-                              onClick={() =>
-                                router.push(`/students/edit/${student?.id}`)
-                              }
-                              className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors duration-200"
-                            >
-                              <EditOutlined />
-                            </Tooltip>
-                            <button
-                              onClick={() => handleDelete(student.id)}
-                              className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
-                            >
-                              <DeleteOutlined />
-                            </button>
+                              <button
+                                disabled={deletingStudents.has(student.id)}
+                                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {deletingStudents.has(student.id) ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <DeleteOutlined />
+                                )}
+                              </button>
+                            </Popconfirm>
                           </div>
                         </td>
                       </tr>
@@ -556,6 +641,22 @@ export default function StudentsPage() {
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedRowKeys.includes(student.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRowKeys((prev) => [
+                                ...prev,
+                                student.id,
+                              ]);
+                            } else {
+                              setSelectedRowKeys((prev) =>
+                                prev.filter((id) => id !== student.id)
+                              );
+                            }
+                          }}
+                        />
                         <img
                           src={student.avatar}
                           alt={student.name}
@@ -627,12 +728,25 @@ export default function StudentsPage() {
                         >
                           <EditOutlined />
                         </button>
-                        <button
-                          onClick={() => handleDelete(student.id)}
-                          className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                        <Popconfirm
+                          title="Delete Student"
+                          description="Are you sure you want to delete this student? This action cannot be undone."
+                          onConfirm={() => handleDelete(student.id)}
+                          okText="Yes, Delete"
+                          cancelText="Cancel"
+                          okButtonProps={{ danger: true }}
                         >
-                          <DeleteOutlined />
-                        </button>
+                          <button
+                            disabled={deletingStudents.has(student.id)}
+                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {deletingStudents.has(student.id) ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <DeleteOutlined />
+                            )}
+                          </button>
+                        </Popconfirm>
                       </div>
                     </div>
                   </div>

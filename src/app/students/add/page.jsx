@@ -254,17 +254,17 @@ export default function AddStudentPage() {
     mode: "onTouched",
   });
 
-  const [addLoading , setAddLoading] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
 
   const onSubmit = async (values) => {
     const token = localStorage.getItem("AccessToken");
     setAddLoading(true);
     const payload = {
       ...values,
-      student_name : values?.name,
-      student_email : values?.email,
-      phone:values?.phone,
-      password:values?.password,
+      student_name: values?.name,
+      student_email: values?.email,
+      phone: values?.phone,
+      password: values?.password,
       created_at: Date.now(),
       // enrollmentDate: values.enrollmentDate
       //   ? values.enrollmentDate.format("YYYY-MM-DD")
@@ -272,24 +272,26 @@ export default function AddStudentPage() {
     };
 
     console.log("Submitted Student:", payload);
-    axios.post(BASE_URL+"/students/add_students.php",payload , {
-      headers : {
-        "Authorization":`Bearer ${token}`
-      }
-    }).then(res =>{
-      console.log(res);
-      if(res?.data?.status == "success") {
-        toast.success(res?.data?.message);
-        axios.get(BASE_URL+'/students/select_students.php')
-        reset();
-      }else{
-        toast.error(res?.data?.message);
-      }
-    }).catch(e => console.log(e))
-    .finally(() => {
-      setAddLoading(false);
-      reset();
-    })
+    axios
+      .post(BASE_URL + "/students/add_students.php", payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => {
+        console.log(res);
+        if (res?.data?.status == "success") {
+          toast.success(res?.data?.message);
+          axios.get(BASE_URL + "/students/select_students.php");
+          reset();
+        } else {
+          toast.error(res?.data?.message);
+        }
+      })
+      .catch((e) => console.log(e))
+      .finally(() => {
+        setAddLoading(false);
+      });
 
     // reset();
   };
