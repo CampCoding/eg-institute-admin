@@ -64,15 +64,24 @@ export default function Page() {
     },
   ];
 
-  const handleDropDownClick = ({ info, id }) => {
+  const handleDropDownClick = ({ info, id, course_id }) => {
     const { key } = info;
     const g_id = id;
+
+    console.log(key, "key");
+
     if (key === "videos") {
-      router.push(`/groups/GroupContent/${g_id}?type=video`);
+      router.push(
+        `/groups/GroupContent/${g_id}?type=video&course_id=${course_id}`
+      );
     } else if (key === "Pdf") {
-      router.push(`/groups/GroupContent/${g_id}?type=pdf`);
+      router.push(
+        `/groups/GroupContent/${g_id}?type=pdf&course_id=${course_id}`
+      );
     } else if (key === "Quizzes") {
-      router.push(`/groups/GroupContent/${g_id}?type=quiz`);
+      router.push(
+        `/groups/GroupContent/${g_id}?type=quiz&course_id=${course_id}`
+      );
     }
   };
 
@@ -80,7 +89,7 @@ export default function Page() {
   useEffect(() => {
     if (!data?.message) return;
 
-    const mapped = data.message.map((g) => ({
+    const mapped = data?.message?.map((g) => ({
       id: g?.group_id,
       name: g?.group_name,
       members: Number(g?.members_count ?? 0),
@@ -89,6 +98,8 @@ export default function Page() {
       progress: Number(g?.progress ?? 75), // default if not provided
       status: g?.status || "inactive",
       maxStudents: Number(g?.max_students ?? 0),
+      course_name: g?.course_name,
+      course_id: Number(g?.course_id),
     }));
 
     setGroups(mapped);
@@ -461,7 +472,11 @@ export default function Page() {
                       menu={{
                         items,
                         onClick: (info) =>
-                          handleDropDownClick({ info, id: g.id }),
+                          handleDropDownClick({
+                            info,
+                            id: g.id,
+                            course_id: g.course_id,
+                          }),
                       }}
                     >
                       <a onClick={(e) => e.preventDefault()}>
@@ -507,8 +522,6 @@ export default function Page() {
         title={"Delete this group"}
         description={`Do you want to delete this group "${rowData?.name}"?`}
         handleSubmit={handleSubmit}
-        // If DeleteModal supports loading prop, pass deleteLoading here:
-        // loading={deleteLoading}
       />
     </div>
   );

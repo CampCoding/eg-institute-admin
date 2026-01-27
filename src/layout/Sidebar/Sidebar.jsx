@@ -455,7 +455,7 @@ const links = [
   { id: 8, label: "Scheduling", icon: CalendarRange, href: "/scheduling" },
 
   {
-    id: 9,
+    id: 13,
     label: "Subscriptions",
     icon: UserCheck,
     href: "/subscriptions",
@@ -466,12 +466,12 @@ const links = [
         icon: UserCheck,
         href: "/subscriptions",
       },
-      {
-        id: 2,
-        name: "Add Subscription",
-        icon: CirclePlus,
-        href: "/finance-transactions/add-finance",
-      },
+      // {
+      //   id: 2,
+      //   name: "Add Subscription",
+      //   icon: CirclePlus,
+      //   href: "/subscriptions/add",
+      // },
     ],
   },
   {

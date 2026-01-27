@@ -43,7 +43,7 @@ export default function LiveCoursesPage() {
 
       if (response?.data.status === "success") {
         // Transform API data to match UI structure
-        const transformedData = response?.data.message.map((course) => ({
+        const transformedData = response?.data?.message?.map((course) => ({
           id: course.course_id,
           title: course.course_name,
           description: course.course_descreption,
