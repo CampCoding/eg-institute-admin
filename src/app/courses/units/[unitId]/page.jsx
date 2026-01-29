@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import { courses } from "@/utils/data";
 import {
   ChevronDown,
   ChevronUp,
@@ -18,9 +17,15 @@ import {
   Eye,
   Trash,
   Loader2,
-  EyeOff, // 👈 for status icon
+  EyeOff,
+  BookOpen,
+  FileText,
+  Video,
+  HelpCircle,
+  GripVertical,
+  MoreVertical,
 } from "lucide-react";
-import { Tooltip } from "antd";
+import { Tooltip, Dropdown } from "antd";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
 import axios from "axios";
 import { BASE_URL } from "../../../../utils/base_url";
@@ -29,7 +34,6 @@ import Link from "next/link";
 import { useDispatch } from "react-redux";
 import { setUnit } from "../../../../utils/Store/UnitsSlice";
 
-/** Utility: format total minutes like 125 -> "2h 5m" */
 const fmtMinutes = (mins = 0) => {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
@@ -38,7 +42,7 @@ const fmtMinutes = (mins = 0) => {
   return `${m}m`;
 };
 
-export default function courseUnitsPage() {
+export default function CourseUnitsPage() {
   const router = useRouter();
   const params = useParams();
   const id = useMemo(
@@ -47,20 +51,15 @@ export default function courseUnitsPage() {
   );
 
   const [rowData, setRowData] = useState({});
-  const [course, setcourse] = useState(null);
   const [expanded, setExpanded] = useState({});
-  const [completed, setCompleted] = useState({});
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true); // main loading flag
+  const [loading, setLoading] = useState(true);
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [allUnits, setAllUnits] = useState([]);
-  const [allCourses, setAllCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState({});
-  const dispatch = useDispatch();
-
-  // 👇 status modal state
-  const [openStatusModal, setOpenStatusModal] = useState(null); // holds unit object or null
+  const [openStatusModal, setOpenStatusModal] = useState(null);
   const [openStatusLoading, setOpenStatusLoading] = useState(false);
+  const dispatch = useDispatch();
 
   // Fetch selected course info
   useEffect(() => {
@@ -70,9 +69,7 @@ export default function courseUnitsPage() {
     setLoading(true);
     axios
       .get(BASE_URL + "/courses/select_courses.php", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
         if (res?.data?.status === "success") {
@@ -86,21 +83,18 @@ export default function courseUnitsPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Fetch units of this course
+  // Fetch units
   useEffect(() => {
     if (!id) return;
     const token = localStorage.getItem("AccessToken");
-    const data_send = {
-      course_id: id,
-    };
 
     setLoading(true);
     axios
-      .post(BASE_URL + "/units/select_course_units.php", data_send, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      .post(
+        BASE_URL + "/units/select_course_units.php",
+        { course_id: id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
       .then((res) => {
         if (res?.data?.status === "success") {
           setAllUnits(res?.data?.message || []);
@@ -109,195 +103,141 @@ export default function courseUnitsPage() {
       .catch((e) => console.log(e))
       .finally(() => setLoading(false));
   }, [id]);
-  console.log(setAllUnits);
-
-  // Local demo course meta (progress calculation etc.)
-  useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    const found = courses?.find((c) => String(c?.id) === String(id)) ?? null;
-
-    setcourse(found);
-    setLoading(false);
-
-    if (found?.units?.[0]?.unitId) {
-      setExpanded({ [found.units[0].unitId]: true });
-    }
-  }, [id]);
-
-  const flatLessons = useMemo(() => {
-    if (!course?.units) return [];
-    return course?.units.flatMap((unit) =>
-      (unit.videos || []).map((v, i) => ({
-        ...unit,
-        videoUrl: v,
-        unitId: unit.unitId,
-        lessonId: `lesson-${unit.unitId}-${i + 1}`,
-        lessonTitle: `Lesson ${i + 1}: ${unit.name}`,
-        pdfUrl: unit.pdfs?.[i] || "",
-      }))
-    );
-  }, [course]);
 
   const filteredUnits = useMemo(() => {
     if (!allUnits) return [];
     const q = search.trim().toLowerCase();
     if (!q) return allUnits;
-
-    // add real filtering later if you want
-    return allUnits.map((unit) => ({
-      ...unit,
-    }));
+    return allUnits.filter((unit) =>
+      unit?.unit_title?.toLowerCase().includes(q)
+    );
   }, [allUnits, search]);
 
-  const totalLessons = flatLessons.length || 0;
-  const completedCount = useMemo(
-    () => Object.values(completed).filter(Boolean).length,
-    [completed]
-  );
-  const progress =
-    totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
-
   const toggleUnit = (unitId) =>
-    setExpanded((s) => ({ ...s, [unitId]: !s[unitId] }));
+    // setExpanded((s) => ({ ...s, [unitId]: !s[unitId] }));
 
-  const toggleComplete = (lessonId) =>
-    setCompleted((s) => ({ ...s, [lessonId]: !s[lessonId] }));
+    async function handleChangeStatus() {
+      if (!openStatusModal?.unit_id) return;
 
-  function handleSubmit() {
-    console.log("Delete");
-  }
+      try {
+        setOpenStatusLoading(true);
+        const token = localStorage.getItem("AccessToken");
 
-  // 👇 STATUS CHANGE HANDLER (with refetch)
-  async function handleChangeStatus() {
-    if (!openStatusModal?.unit_id) return;
-
-    try {
-      setOpenStatusLoading(true);
-      const token = localStorage.getItem("AccessToken");
-
-      const res = await axios.post(
-        BASE_URL + `/units/toggle_unit.php`,
-        { unit_id: openStatusModal.unit_id },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (res?.data?.status === "success") {
-        toast.success(res?.data?.message || "Unit status updated");
-
-        // refetch units after toggle
-        const unitsRes = await axios.post(
-          BASE_URL + "/units/select_course_units.php",
-          { course_id: id },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+        const res = await axios.post(
+          BASE_URL + `/units/toggle_unit.php`,
+          { unit_id: openStatusModal.unit_id },
+          { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        if (unitsRes?.data?.status === "success") {
-          setAllUnits(unitsRes?.data?.message || []);
+        if (res?.data?.status === "success") {
+          toast.success(res?.data?.message || "Unit status updated");
+
+          const unitsRes = await axios.post(
+            BASE_URL + "/units/select_course_units.php",
+            { course_id: id },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          if (unitsRes?.data?.status === "success") {
+            setAllUnits(unitsRes?.data?.message || []);
+          }
+
+          setOpenStatusModal(null);
+        } else {
+          toast.error(res?.data?.message || "Something went wrong");
         }
-
-        setOpenStatusModal(null);
-      } else {
-        toast.error(res?.data?.message || "Something went wrong");
+      } catch (e) {
+        toast.error("Failed to update unit status");
+      } finally {
+        setOpenStatusLoading(false);
       }
-    } catch (e) {
-      console.log(e);
-      toast.error("Failed to update unit status");
-    } finally {
-      setOpenStatusLoading(false);
-    }
-  }
+    };
 
-  // 👇 HANDLE LOADING HERE
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-slate-600">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <p className="text-sm">Loading course units...</p>
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Loading units...</p>
         </div>
       </div>
     );
   }
-  // 👆 END LOADING HANDLER
-  console.log(selectedCourse);
 
   return (
-    <div className="min-h-screen">
-      <div className="flex mb-4 items-center gap-2">
+    <div className="min-h-screen pb-10">
+      {/* Header Actions */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <button
-          type="button"
           onClick={() => router.back()}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
         >
-          <ArrowLeft size={16} className="inline -mt-0.5 mr-1" />
-          Back
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back</span>
         </button>
         <button
-          type="button"
           onClick={() => router.push(`/courses/units/${id}/add-unit`)}
-          className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] !text-white px-3 py-2 text-sm hover:opacity-90"
+          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-xl hover:shadow-lg hover:shadow-teal-200 transition-all"
         >
-          <Plus size={16} /> Add
+          <Plus className="w-4 h-4" />
+          <span>Add Unit</span>
         </button>
       </div>
 
       <BreadCrumb
-        title={`Units of ${course?.title}` || "course Units"}
-        parent="courses"
+        title={`Units - ${selectedCourse?.course_name || "Course"}`}
+        parent="Courses"
         child="Units"
       />
 
-      {/* Header strip */}
-      <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="relative h-16 w-28 overflow-hidden rounded-xl ring-1 ring-slate-200">
-              {selectedCourse?.video ? (
-                <video
-                  src={selectedCourse?.video}
-                  poster={selectedCourse?.image}
-                  className="h-full w-full object-cover"
-                  muted
-                  playsInline
-                />
-              ) : (
-                <img
-                  src={
-                    selectedCourse?.image ||
-                    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop"
-                  }
-                  alt="poster"
-                  className="h-full w-full object-cover"
-                />
-              )}
-              <div
-                className={`absolute inset-0 bg-gradient-to-r ${course?.color} opacity-20`}
+      {/* Course Header Card */}
+      <div className="mt-6 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="relative h-32 bg-gradient-to-r from-teal-600 to-cyan-600">
+          {selectedCourse?.image && (
+            <img
+              src={selectedCourse.image}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover opacity-20"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-r from-teal-600/90 to-cyan-600/90" />
+        </div>
+
+        <div className="relative px-6 pb-6">
+          <div className="flex flex-col sm:flex-row gap-4 -mt-10">
+            {/* Course Image */}
+            <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-4 border-white shadow-lg flex-shrink-0">
+              <img
+                src={
+                  selectedCourse?.image ||
+                  "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=200"
+                }
+                alt=""
+                className="w-full h-full object-cover"
               />
             </div>
-            <div>
-              <h1 className="text-lg font-semibold leading-tight line-clamp-2">
+
+            {/* Course Info */}
+            <div className="flex-1 pt-4 sm:pt-8">
+              <h1 className="text-xl font-bold text-gray-900 !mt-2">
                 {selectedCourse?.course_name}
               </h1>
-              <p className="text-sm text-slate-600 line-clamp-2">
+              <p className="text-gray-600 text-sm mt-1 line-clamp-2">
                 {selectedCourse?.course_descreption}
               </p>
-              <div className="mt-1 flex items-center gap-4 text-sm text-slate-600">
-                <span className="inline-flex items-center gap-1">
-                  <ListChecks size={16} />
-                  {selectedCourse?.lessons} lessons
+
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                <span className="flex items-center gap-1.5 bg-teal-50 text-teal-700 px-3 py-1.5 rounded-lg">
+                  <ListChecks className="w-4 h-4" />
+                  {selectedCourse?.lessons || 0} lessons
                 </span>
-                <span className="inline-flex items-center gap-1">
-                  <Clock3 size={16} />
-                  {fmtMinutes(selectedCourse?.lessons * 15)}
+                <span className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg">
+                  <Clock3 className="w-4 h-4" />
+                  {fmtMinutes((selectedCourse?.lessons || 0) * 15)}
+                </span>
+                <span className="flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg">
+                  <BookOpen className="w-4 h-4" />
+                  {allUnits?.length || 0} units
                 </span>
               </div>
             </div>
@@ -305,256 +245,313 @@ export default function courseUnitsPage() {
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="mt-4 flex flex-col lg:flex-row gap-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2 ring-1 ring-slate-200">
-            <Search size={18} className="text-slate-500" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search Units"
-              className="bg-transparent outline-none text-sm w-full placeholder:text-slate-500"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              setExpanded(
-                Object.fromEntries(
-                  (allUnits || []).map((u) => [u.unit_id, true])
-                )
-              )
-            }
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white hover:bg-slate-50"
-          >
-            Expand all
-          </button>
-          <button
-            type="button"
-            onClick={() => setExpanded({})}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white hover:bg-slate-50"
-          >
-            Collapse all
-          </button>
+      {/* Search & Toolbar */}
+      <div className="mt-6 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search units..."
+            className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+          />
         </div>
       </div>
 
-      {/* Main grid */}
-      <div className="mt-5 grid gap-6 lg:grid-cols-3">
-        {/* Units */}
-        <div className="lg:col-span-2 space-y-4">
-          {filteredUnits.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-600">
-              No lessons match your search.
-            </div>
-          ) : (
-            filteredUnits.map((unit) => {
-              console.log(unit);
-              const open = !!expanded[unit.unit_id];
+      {/* Units List */}
+      <div className="mt-6 space-y-4">
+        {filteredUnits.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+            <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900">
+              No units found
+            </h3>
+            <p className="text-gray-500 mt-1">
+              {search
+                ? "Try adjusting your search"
+                : "Add your first unit to get started"}
+            </p>
+            {!search && (
+              <button
+                onClick={() => router.push(`/courses/units/${id}/add-unit`)}
+                className="mt-4 inline-flex items-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-teal-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Unit
+              </button>
+            )}
+          </div>
+        ) : (
+          filteredUnits.map((unit, index) => {
+            const isOpen = !!expanded[unit.unit_id];
+            const isHidden = unit?.hidden === "1" || unit?.hidden === 1;
 
-              return (
-                <section
-                  key={unit.unit_id}
-                  className="rounded-2xl border border-slate-200 bg-white overflow-hidden"
+            return (
+              <div
+                key={unit.unit_id}
+                className={`bg-white rounded-2xl border overflow-hidden transition-all ${
+                  isHidden ? "border-rose-200 bg-rose-50/30" : "border-gray-100"
+                }`}
+              >
+                {/* Unit Header */}
+                <div
+                  className={`p-4 flex items-center gap-4 cursor-pointer hover:bg-gray-50 transition-colors ${
+                    isHidden ? "hover:bg-rose-50" : ""
+                  }`}
+                  onClick={() =>
+                    router.push(
+                      `/courses/units/${id}/unit-detail/${unit?.unit_id}`
+                    )
+                  }
                 >
-                  {/* Section header */}
-                  <button
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
-                    aria-expanded={open}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="grid place-items-center size-8 rounded-lg bg-slate-100 text-slate-700">
-                        {unit?.unit_id}
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
+                        isHidden
+                          ? "bg-rose-100 text-rose-700"
+                          : "bg-teal-100 text-teal-700"
+                      }`}
+                    >
+                      {index + 1}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/courses/units/${id}/unit-detail/${unit?.unit_id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dispatch(setUnit(unit));
+                          }}
+                          className="font-semibold text-gray-900 hover:text-teal-600 transition-colors truncate"
+                        >
+                          {unit?.unit_title}
+                        </Link>
+                        {isHidden && (
+                          <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">
+                            Hidden
+                          </span>
+                        )}
                       </div>
-                      <div className="text-left">
-                        <div>
-                          <Link
-                            href={`/courses/units/${id}/unit-detail/${unit?.unit_id}`}
-                            onClick={() => {
-                              dispatch(setUnit(unit));
-                            }}
-                            className="font-medium text-slate-900"
-                          >
-                            {unit?.unit_title}
-                          </Link>
-                        </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                        <span className="flex items-center gap-1">
+                          <Video className="w-3.5 h-3.5" />
+                          {unit?.videos?.length || 0} videos
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5" />
+                          {unit?.pdfs?.length || 0} PDFs
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <HelpCircle className="w-3.5 h-3.5" />
+                          {unit?.quizzes?.length || 0} quizzes
+                        </span>
                       </div>
                     </div>
-                    <div className="flex gap-3 items-center">
-                      {/* Status toggle */}
-                      <Tooltip
-                        title={
-                          unit?.hidden == "1"
-                            ? "Show this unit"
-                            : "Hide this unit"
-                        }
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setOpenStatusModal(unit)}
-                          className="p-1 rounded-md hover:bg-slate-100"
-                        >
-                          {unit?.hidden == "1" ? (
-                            <EyeOff size={15} />
-                          ) : (
-                            <Eye size={15} />
-                          )}
-                        </button>
-                      </Tooltip>
+                  </div>
 
-                      <Tooltip
-                        title="Edit"
+                  {/* Actions */}
+                  <div
+                    className="flex items-center gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Tooltip title={isHidden ? "Show" : "Hide"}>
+                      <button
+                        onClick={() => setOpenStatusModal(unit)}
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                      >
+                        {isHidden ? (
+                          <Eye className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <EyeOff className="w-4 h-4 text-gray-500" />
+                        )}
+                      </button>
+                    </Tooltip>
+
+                    <Tooltip title="Edit">
+                      <button
                         onClick={() =>
                           router.push(
                             `/courses/units/${id}/edit-unit/${unit?.unit_id}`
                           )
                         }
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                       >
-                        <Pencil size={15} />
-                      </Tooltip>
-                      <Tooltip
+                        <Pencil className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </Tooltip>
+
+                    <Tooltip title="Delete">
+                      <button
                         onClick={() => {
                           setOpenDeleteModal(true);
                           setRowData(unit);
                         }}
-                        title="Delete"
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                       >
-                        <Trash size={15} />
-                      </Tooltip>
+                        <Trash className="w-4 h-4 text-rose-500" />
+                      </button>
+                    </Tooltip>
 
-                      <div onClick={() => toggleUnit(unit.unit_id)}>
-                        {open ? <ChevronUp /> : <ChevronDown />}
+                    {/* <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                      {isOpen ? (
+                        <ChevronUp className="w-5 h-5 text-gray-500" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-gray-500" />
+                      )}
+                    </button> */}
+                  </div>
+                </div>
+
+                {/* Expanded Content */}
+                {isOpen && (
+                  <div className="border-t border-gray-100 bg-gray-50/50 p-4">
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      {/* Videos */}
+                      <div className="bg-white rounded-xl border border-gray-100 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <Video className="w-4 h-4 text-blue-600" />
+                            <span className="font-medium text-gray-900">
+                              Videos
+                            </span>
+                          </div>
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                            {unit?.videos?.length || 0}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() =>
+                            router.push(
+                              `/courses/units/${id}/unit-detail/${unit?.unit_id}/add-video`
+                            )
+                          }
+                          className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-600 hover:border-blue-300 hover:text-blue-600 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Video
+                        </button>
+                      </div>
+
+                      {/* PDFs */}
+                      <div className="bg-white rounded-xl border border-gray-100 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-rose-600" />
+                            <span className="font-medium text-gray-900">
+                              PDFs
+                            </span>
+                          </div>
+                          <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">
+                            {unit?.pdfs?.length || 0}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() =>
+                            router.push(
+                              `/courses/units/${id}/unit-detail/${unit?.unit_id}/add-pdf`
+                            )
+                          }
+                          className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-600 hover:border-rose-300 hover:text-rose-600 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add PDF
+                        </button>
+                      </div>
+
+                      {/* Quizzes */}
+                      <div className="bg-white rounded-xl border border-gray-100 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <HelpCircle className="w-4 h-4 text-purple-600" />
+                            <span className="font-medium text-gray-900">
+                              Quizzes
+                            </span>
+                          </div>
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                            {unit?.quizzes?.length || 0}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() =>
+                            router.push(
+                              `/courses/units/${id}/unit-detail/${unit?.unit_id}/add-quiz`
+                            )
+                          }
+                          className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-600 hover:border-purple-300 hover:text-purple-600 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Quiz
+                        </button>
                       </div>
                     </div>
-                  </button>
-
-                  {/* Lessons list */}
-                  {open && (
-                    <ul className="divide-y divide-slate-200">
-                      {(unit.videos || []).map((video, i) => {
-                        const lessonId = `${unit.unit_id}-lesson-${i + 1}`;
-                        const done = !!completed[lessonId];
-
-                        return (
-                          <li
-                            key={lessonId}
-                            className="flex items-center justify-between gap-3 px-4 py-3"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <button
-                                onClick={() => toggleComplete(lessonId)}
-                                className={`grid place-items-center size-6 rounded-full border ${
-                                  done
-                                    ? "bg-emerald-50 border-emerald-200 text-emerald-600"
-                                    : "bg-white border-slate-300 text-slate-400"
-                                }`}
-                                title={
-                                  done ? "Mark incomplete" : "Mark complete"
-                                }
-                              >
-                                <CheckCircle2 size={16} />
-                              </button>
-
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium truncate">
-                                    {`Lesson ${i + 1}`}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-slate-500 flex items-center gap-2">
-                                  <Clock3 size={14} />
-                                  <span>{fmtMinutes(15)}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                onClick={() =>
-                                  router.push(
-                                    `/courses/${course?.id}?play=${lessonId}`
-                                  )
-                                }
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50"
-                              >
-                                <Play size={16} />
-                                Play
-                              </button>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </section>
-              );
-            })
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <aside className="rounded-2xl border border-slate-200 bg-white p-5 h-max sticky top-20">
-          <h4 className="font-semibold">About this course?</h4>
-          <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-slate-700">
-            <div className="rounded-xl border border-slate-200 p-3">
-              <div className="text-xs text-slate-500">Level</div>
-              <div className="font-medium">{selectedCourse?.level}</div>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-3">
-              <div className="text-xs text-slate-500">Duration</div>
-              <div className="font-medium">{selectedCourse?.Duration}</div>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <button
-              onClick={() =>
-                router.push(`/courses/${selectedCourse?.course_id}`)
-              }
-              className="w-full rounded-xl bg-[var(--primary-color)] !text-white px-4 py-2 text-sm font-medium hover:opacity-90"
-            >
-              Go to course? overview
-            </button>
-          </div>
-        </aside>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Status Modal */}
       {openStatusModal && (
-        <div className="fixed inset-0 !z-[9999999999] flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
-            <h3 className="text-lg font-semibold">
-              {openStatusModal?.hidden == "1"
-                ? "Show this unit?"
-                : "Hide this unit?"}
-            </h3>
-            <p className="mt-2 text-sm text-slate-600">
-              {openStatusModal?.hidden == "1"
-                ? "This unit is currently hidden. Do you want to make it visible to students?"
-                : "This unit is currently visible. Do you want to hide it from students?"}
-            </p>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div
+              className={`p-6 text-center ${
+                openStatusModal?.hidden === "1"
+                  ? "bg-emerald-50"
+                  : "bg-amber-50"
+              }`}
+            >
+              <div
+                className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${
+                  openStatusModal?.hidden === "1"
+                    ? "bg-emerald-100"
+                    : "bg-amber-100"
+                }`}
+              >
+                {openStatusModal?.hidden === "1" ? (
+                  <Eye className="w-8 h-8 text-emerald-600" />
+                ) : (
+                  <EyeOff className="w-8 h-8 text-amber-600" />
+                )}
+              </div>
 
-            <div className="mt-5 flex justify-end gap-2">
+              <h3 className="text-xl font-bold text-gray-900">
+                {openStatusModal?.hidden === "1"
+                  ? "Show this unit?"
+                  : "Hide this unit?"}
+              </h3>
+              <p className="text-gray-600 mt-2">
+                {openStatusModal?.hidden === "1"
+                  ? "This unit will be visible to students."
+                  : "This unit will be hidden from students."}
+              </p>
+              <p className="text-sm font-medium text-gray-500 mt-1">
+                "{openStatusModal?.unit_title}"
+              </p>
+            </div>
+
+            <div className="p-6 flex gap-3">
               <button
-                type="button"
                 onClick={() => setOpenStatusModal(null)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50"
                 disabled={openStatusLoading}
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                type="button"
                 onClick={handleChangeStatus}
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] px-4 py-2 text-sm !text-white hover:opacity-90 disabled:opacity-70"
                 disabled={openStatusLoading}
+                className={`flex-1 px-4 py-3 rounded-xl font-medium text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                  openStatusModal?.hidden === "1"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-amber-600 hover:bg-amber-700"
+                }`}
               >
                 {openStatusLoading && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 )}
                 Confirm
               </button>
@@ -565,10 +562,10 @@ export default function courseUnitsPage() {
 
       <DeleteModal
         open={openDeleteModal}
-        title={"Delete This Unit"}
-        description={`Do you want to delete this ${rowData?.unit_title}?`}
+        title="Delete Unit"
+        description={`Are you sure you want to delete "${rowData?.unit_title}"?`}
         setOpen={setOpenDeleteModal}
-        handleSubmit={handleSubmit}
+        handleSubmit={() => {}}
       />
     </div>
   );

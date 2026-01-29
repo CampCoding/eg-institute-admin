@@ -1,6 +1,7 @@
+// pages/ProfileReservation.jsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   CalendarClock,
   Clock,
@@ -11,14 +12,21 @@ import {
   EyeOff,
   LayoutGrid,
   Rows3,
+  User,
+  BookOpen,
+  GraduationCap,
+  Calendar,
 } from "lucide-react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import useGetAllSubscriptions from "../../utils/Api/Subscriptions/GetAllSubscriptions";
 import usePostSubscription from "../../utils/Api/Subscriptions/ChangeSubscription";
+// import SubscriptionAcceptModal from "@/components/SubscriptionAcceptModal";
 import toast from "react-hot-toast";
+import { format24to12 } from "@/utils/subscriptionHelpers";
+import SubscriptionAcceptModal from "./_components/SubscriptionAcceptModal";
 
 export default function ProfileReservation() {
-  const [filter, setFilter] = useState("all"); // all | accepted | pending | rejected
+  const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState("table");
   const [cancelEdit, setCancelEdit] = useState({
@@ -28,20 +36,42 @@ export default function ProfileReservation() {
   const [detailsId, setDetailsId] = useState(null);
   const [cancelModalFor, setCancelModalFor] = useState(null);
 
-  const { data } = useGetAllSubscriptions();
+  // Accept Modal State
+  const [acceptModalOpen, setAcceptModalOpen] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
+  const [acceptLoading, setAcceptLoading] = useState(false);
+
+  const { data, refetch } = useGetAllSubscriptions();
   const { mutateAsync, isLoading } = usePostSubscription();
 
-  // Map API → UI shape
-  const subscriptions =
-    data?.message?.map((s) => ({
-      id: s?.subscription_id,
-      title: s?.subscription_type,
-      start: s?.subscription_start_date,
-      status: s?.status, // accepted | pending | rejected
-      cancel_reason: s?.cancel_reason,
-      course_name: s?.course_name,
-      student: s?.student_name,
-    })) ?? [];
+  // البيانات الكاملة من الـ API
+  const rawSubscriptions = data?.message || [];
+
+  // Map API → UI shape (مع الاحتفاظ بالبيانات الكاملة)
+  const subscriptions = rawSubscriptions.map((s) => ({
+    // البيانات المعروضة
+    id: s?.subscription_id,
+    subscription_id: s?.subscription_id,
+    title: s?.subscription_type,
+    start: s?.subscription_start_date,
+    status: s?.status,
+    cancel_reason: s?.cancel_reason,
+    course_name: s?.course_name,
+    student: s?.student_name,
+    // البيانات الإضافية للـ Modal
+    student_name: s?.student_name,
+    student_email: s?.student_email,
+    phone: s?.phone,
+    course_id: s?.course_id,
+    teacher_id: s?.teacher_id,
+    teacher_name: s?.teacher_name,
+    group_id: s?.group_id,
+    group_name: s?.group_name,
+    subscription_type: s?.subscription_type,
+    subscription_start_date: s?.subscription_start_date,
+    slots: s?.slots || [],
+    teacher_slots: s?.teacher_slots || [],
+  }));
 
   const statusStyles = {
     accepted: {
@@ -82,21 +112,75 @@ export default function ProfileReservation() {
   const q = query.trim().toLowerCase();
   const hasDetailsOpen = detailsId !== null;
 
-  const handleStatusChange = async (subscription, nextStatus) => {
-    if (nextStatus === "canceled") return;
+  // فتح modal القبول
+  const handleOpenAcceptModal = (subscription) => {
+    // فقط للاشتراكات الخاصة (private)
+    if (subscription.subscription_type === "private") {
+      setSelectedSubscription(subscription);
+      setAcceptModalOpen(true);
+    } else {
+      setSelectedSubscription(subscription);
+      setAcceptModalOpen(true);
+    }
+  };
 
+  // القبول المباشر (للمجموعات)
+  const handleDirectAccept = async (subscription) => {
     const payload = {
       subscription_id: Number(subscription.id),
-      status: nextStatus,
+      status: "accepted",
     };
 
     try {
       const response = await mutateAsync({ payload });
-      if (response.status === "success") toast.success(response.message);
-      else toast.error(response.message);
+      if (response.status === "success") {
+        toast.success(response.message || "Subscription accepted!");
+        refetch();
+      } else {
+        toast.error(response.message || "Failed to accept");
+      }
     } catch (error) {
-      console.log(error);
+      console.error(error);
       toast.error("Something went wrong. Please try again.");
+    }
+  };
+
+  // معالجة القبول من Modal
+  const handleAcceptFromModal = async (data) => {
+    setAcceptLoading(true);
+
+    try {
+      const payload = {
+        subscription_id: data.subscription_id,
+        status: data.status,
+        new_teacher_id: data.new_teacher_id,
+        new_course_id: data.new_course_id,
+      };
+
+      if (data.schedule_updates && data.schedule_updates.length > 0) {
+        payload.schedule_updates = data.schedule_updates;
+      }
+      if (data.new_group_id) {
+        payload.new_group_id = data.new_group_id;
+      }
+
+      const response = await mutateAsync({ payload });
+
+      if (response.status === "success") {
+        toast.success(
+          response.message || "Subscription accepted successfully!"
+        );
+        setAcceptModalOpen(false);
+        setSelectedSubscription(null);
+        refetch();
+      } else {
+        toast.error(response.message || "Failed to accept subscription");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setAcceptLoading(false);
     }
   };
 
@@ -129,11 +213,12 @@ export default function ProfileReservation() {
         toast.success(response.message);
         setCancelEdit({ id: null, value: "" });
         setCancelModalFor(null);
+        refetch();
       } else {
         toast.error(response.message || "Something went wrong.");
       }
     } catch (error) {
-      console.log(error);
+      console.error(error);
       toast.error("Something went wrong. Please try again.");
     }
   };
@@ -153,12 +238,14 @@ export default function ProfileReservation() {
       const reason = r.cancel_reason?.toLowerCase() ?? "";
       const student = r.student?.toLowerCase() ?? "";
       const course = r.course_name?.toLowerCase() ?? "";
+      const teacher = r.teacher_name?.toLowerCase() ?? "";
 
       return (
         title.includes(q) ||
         status.includes(q) ||
         student.includes(q) ||
         course.includes(q) ||
+        teacher.includes(q) ||
         (reason && reason.includes(q))
       );
     })
@@ -297,6 +384,12 @@ export default function ProfileReservation() {
                         {s.icon}
                         <span>{s.label}</span>
                       </span>
+                      {/* نوع الاشتراك */}
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                        {r.subscription_type === "private"
+                          ? "Private"
+                          : "Group"}
+                      </span>
                     </div>
 
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-900/5 px-2 py-1 text-[10px] font-medium text-slate-600">
@@ -319,15 +412,48 @@ export default function ProfileReservation() {
                   </div>
 
                   <div className="mb-2 space-y-1">
-                    <p className="text-xs text-slate-600">
+                    <p className="text-xs text-slate-600 flex items-center gap-1">
+                      <User className="w-3 h-3" />
                       <span className="font-semibold">Student: </span>
                       {r.student || "-"}
                     </p>
-                    <p className="text-xs text-slate-600">
+                    <p className="text-xs text-slate-600 flex items-center gap-1">
+                      <BookOpen className="w-3 h-3" />
                       <span className="font-semibold">Course: </span>
                       {r.course_name || "-"}
                     </p>
+                    <p className="text-xs text-slate-600 flex items-center gap-1">
+                      <GraduationCap className="w-3 h-3" />
+                      <span className="font-semibold">Teacher: </span>
+                      {r.teacher_name || "-"}
+                    </p>
                   </div>
+
+                  {/* عرض المواعيد */}
+                  {isDetailsOpen && r.slots && r.slots.length > 0 && (
+                    <div className="mt-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="text-[10px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        Scheduled Sessions:
+                      </p>
+                      <div className="space-y-1">
+                        {r.slots.map((slot, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between text-[10px] text-slate-600 bg-white px-2 py-1 rounded"
+                          >
+                            <span className="font-medium">
+                              {slot.day_of_week}
+                            </span>
+                            <span>
+                              {format24to12(slot.start_time)} -{" "}
+                              {format24to12(slot.end_time)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Meta */}
                   <div className="mt-3 space-y-1.5 text-sm text-slate-600">
@@ -381,8 +507,8 @@ export default function ProfileReservation() {
                         },
                         {
                           key: "Accept",
-                          title: "Mark as Accepted",
-                          onClick: () => handleStatusChange(r, "accepted"),
+                          title: "Accept subscription",
+                          onClick: () => handleOpenAcceptModal(r),
                           className: [
                             "items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 hover:border-emerald-200 transition",
                             showDecisionButtons ? "inline-flex" : "hidden",
@@ -392,7 +518,7 @@ export default function ProfileReservation() {
                         },
                         {
                           key: "Reject",
-                          title: "Cancel subscription",
+                          title: "Reject subscription",
                           onClick: () => startCancelEdit(r),
                           className: [
                             "items-center justify-center rounded-full border border-rose-100 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-100 hover:border-rose-200 transition",
@@ -431,7 +557,13 @@ export default function ProfileReservation() {
                   #
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Title / Student / Course
+                  Type
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Student / Course / Teacher
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Schedule
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Status
@@ -462,7 +594,22 @@ export default function ProfileReservation() {
                       {index + 1}
                     </td>
 
-                    {/* Title + Student + Course في التيبول */}
+                    {/* نوع الاشتراك */}
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          r.subscription_type === "private"
+                            ? "bg-purple-50 border border-purple-200 text-purple-700"
+                            : "bg-blue-50 border border-blue-200 text-blue-700"
+                        }`}
+                      >
+                        {r.subscription_type === "private"
+                          ? "Private"
+                          : "Group"}
+                      </span>
+                    </td>
+
+                    {/* Student + Course + Teacher */}
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium text-slate-900">
@@ -471,15 +618,54 @@ export default function ProfileReservation() {
                         <span className="text-[11px] text-slate-400">
                           ID: {r.id}
                         </span>
-                        <span className="text-[11px] text-slate-600">
-                          <span className="font-semibold">Student: </span>
+                        <span className="text-[11px] text-slate-600 flex items-center gap-1">
+                          <User className="w-3 h-3" />
                           {r.student || "-"}
                         </span>
-                        <span className="text-[11px] text-slate-600">
-                          <span className="font-semibold">Course: </span>
+                        <span className="text-[11px] text-slate-600 flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" />
                           {r.course_name || "-"}
                         </span>
+                        <span className="text-[11px] text-slate-600 flex items-center gap-1">
+                          <GraduationCap className="w-3 h-3" />
+                          {r.teacher_name || "-"}
+                        </span>
                       </div>
+                    </td>
+
+                    {/* Schedule */}
+                    <td className="px-4 py-3">
+                      {r.slots && r.slots.length > 0 ? (
+                        <div className="space-y-1">
+                          {r.slots
+                            .slice(0, isDetailsOpen ? undefined : 2)
+                            .map((slot, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2 text-[10px] text-slate-600 bg-slate-50 px-2 py-1 rounded"
+                              >
+                                <Calendar className="w-3 h-3 text-slate-400" />
+                                <span className="font-medium">
+                                  {slot.day_of_week}
+                                </span>
+                                <span className="text-slate-400">|</span>
+                                <span>
+                                  {format24to12(slot.start_time)} -{" "}
+                                  {format24to12(slot.end_time)}
+                                </span>
+                              </div>
+                            ))}
+                          {!isDetailsOpen && r.slots.length > 2 && (
+                            <span className="text-[10px] text-slate-400">
+                              +{r.slots.length - 2} more
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">
+                          No schedule
+                        </span>
+                      )}
                     </td>
 
                     <td className="px-4 py-3">
@@ -494,7 +680,7 @@ export default function ProfileReservation() {
 
                     <td className="px-4 py-3 text-xs text-slate-600">
                       {r.start
-                        ? new Date(r.start).toLocaleString()
+                        ? new Date(r.start).toLocaleDateString()
                         : "No start date"}
                     </td>
 
@@ -538,8 +724,8 @@ export default function ProfileReservation() {
                           },
                           {
                             key: "Accept",
-                            title: "Mark as completed",
-                            onClick: () => handleStatusChange(r, "accepted"),
+                            title: "Accept subscription",
+                            onClick: () => handleOpenAcceptModal(r),
                             className: [
                               "items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 hover:border-emerald-200 transition",
                               showDecisionButtons ? "inline-flex" : "hidden",
@@ -549,7 +735,7 @@ export default function ProfileReservation() {
                           },
                           {
                             key: "Reject",
-                            title: "Cancel subscription",
+                            title: "Reject subscription",
                             onClick: () => startCancelEdit(r),
                             className: [
                               "items-center justify-center rounded-full border border-rose-100 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-100 hover:border-rose-200 transition",
@@ -581,6 +767,21 @@ export default function ProfileReservation() {
         </div>
       )}
 
+      {/* Accept Modal */}
+      {acceptModalOpen && selectedSubscription && (
+        <SubscriptionAcceptModal
+          isOpen={acceptModalOpen}
+          onClose={() => {
+            setAcceptModalOpen(false);
+            setSelectedSubscription(null);
+          }}
+          subscription={selectedSubscription}
+          allSubscriptions={subscriptions}
+          onAccept={handleAcceptFromModal}
+          loading={acceptLoading}
+        />
+      )}
+
       {/* Cancel Reason Modal */}
       {cancelModalFor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -588,7 +789,7 @@ export default function ProfileReservation() {
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">
-                  Cancel subscription
+                  Reject subscription
                 </h2>
                 <p className="mt-0.5 text-[11px] text-slate-500">
                   {cancelModalFor.title} (ID: {cancelModalFor.id})
@@ -607,7 +808,7 @@ export default function ProfileReservation() {
 
             <div className="mt-2">
               <label className="mb-1 block text-[11px] font-medium text-slate-700">
-                Cancel reason
+                Rejection reason
               </label>
               <input
                 type="text"
@@ -623,7 +824,7 @@ export default function ProfileReservation() {
                 className={`w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-400 ${
                   isLoading ? "opacity-70 cursor-not-allowed" : ""
                 }`}
-                placeholder="Enter reason for canceling this subscription..."
+                placeholder="Enter reason for rejecting this subscription..."
               />
             </div>
 
@@ -652,7 +853,7 @@ export default function ProfileReservation() {
                     <span>Saving...</span>
                   </>
                 ) : (
-                  "Save & Cancel"
+                  "Save & Reject"
                 )}
               </button>
             </div>

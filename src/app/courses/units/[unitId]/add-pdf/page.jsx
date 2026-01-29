@@ -1,9 +1,19 @@
 "use client";
-import React, { useMemo, useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
-import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 
+import React, { useEffect, useMemo, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import {
+  ArrowLeft,
+  Save,
+  FileText,
+  Loader2,
+  Upload,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  X,
+  Eye,
+} from "lucide-react";
+import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -12,7 +22,6 @@ import usePostUnitsPdfs from "@/utils/Api/Units/PostUnitspdfs";
 import toast from "react-hot-toast";
 
 const isValidUrl = (v) => {
-  if (!v) return false;
   try {
     new URL(v);
     return true;
@@ -22,16 +31,14 @@ const isValidUrl = (v) => {
 };
 
 const schema = yup.object({
-  name: yup.string().trim().required("Unit title is required"),
-
+  name: yup.string().trim().required("PDF title is required"),
   pdfMode: yup.mixed().oneOf(["upload", "link"]).required(),
   pdfFile: yup.mixed().when("pdfMode", {
     is: "upload",
     then: (s) =>
       s
         .required("Please upload a PDF")
-        .test("fileRequired", "Please upload a PDF", (v) => v instanceof File)
-        .test("fileType", "Only PDF files are allowed", (v) =>
+        .test("fileType", "Only PDF files allowed", (v) =>
           v instanceof File ? v.type === "application/pdf" : false
         ),
     otherwise: (s) => s.nullable(),
@@ -41,60 +48,37 @@ const schema = yup.object({
     then: (s) =>
       s
         .required("Please add a PDF link")
-        .test("isUrl", "Invalid URL", (v) => isValidUrl(v))
-        .test("isPdf", "Link must be a .pdf", (v) =>
-          typeof v === "string" ? v.toLowerCase().includes(".pdf") : false
+        .test("isUrl", "Invalid URL", isValidUrl)
+        .test("isPdf", "Must be a .pdf link", (v) =>
+          v?.toLowerCase().includes(".pdf")
         ),
     otherwise: (s) => s.optional(),
   }),
-
-  // OPTIONAL: thumbnail (image) upload or link
   thumbMode: yup.mixed().oneOf(["upload", "link"]).required(),
   thumbFile: yup.mixed().when("thumbMode", {
     is: "upload",
     then: (s) =>
       s
-        .required("Please upload a thumbnail image")
-        .test(
-          "fileRequired",
-          "Please upload a thumbnail image",
-          (v) => v instanceof File
-        )
-        .test("imgType", "Only image files are allowed", (v) =>
+        .required("Please upload a thumbnail")
+        .test("imgType", "Only images allowed", (v) =>
           v instanceof File ? v.type.startsWith("image/") : false
         ),
     otherwise: (s) => s.nullable(),
   }),
-
   thumbLink: yup.string().when("thumbMode", {
     is: "link",
     then: (s) =>
       s
-        .required("Please add a thumbnail image link")
-        .test("isUrl", "Invalid URL", (v) => isValidUrl(v)),
+        .required("Please add thumbnail URL")
+        .test("isUrl", "Invalid URL", isValidUrl),
     otherwise: (s) => s.optional(),
   }),
 });
 
-export default function AddUnitPage() {
+export default function AddPdfPage() {
   const { unitId } = useParams();
   const router = useRouter();
   const { mutateAsync, isPending } = usePostUnitsPdfs();
-
-  const defaultValues = useMemo(
-    () => ({
-      name: "",
-
-      pdfMode: "upload",
-      pdfFile: null,
-      pdfLink: "",
-
-      thumbMode: "upload",
-      thumbFile: null,
-      thumbLink: "",
-    }),
-    []
-  );
 
   const {
     register,
@@ -105,97 +89,70 @@ export default function AddUnitPage() {
     formState: { errors, isSubmitting },
     clearErrors,
   } = useForm({
-    defaultValues,
+    defaultValues: {
+      name: "",
+      pdfMode: "upload",
+      pdfFile: null,
+      pdfLink: "",
+      thumbMode: "upload",
+      thumbFile: null,
+      thumbLink: "",
+    },
     resolver: yupResolver(schema),
     mode: "onTouched",
   });
 
-  // ---- watch modes/values ----
   const pdfMode = watch("pdfMode");
   const pdfFile = watch("pdfFile");
   const pdfLink = watch("pdfLink");
-
   const thumbMode = watch("thumbMode");
   const thumbFile = watch("thumbFile");
   const thumbLink = watch("thumbLink");
 
-  // ---- PDF Preview URL (file) ----
   const [pdfUrl, setPdfUrl] = useState("");
+  const [imgUrl, setImgUrl] = useState("");
+
   useEffect(() => {
-    if (pdfMode !== "upload" || !(pdfFile instanceof File)) {
-      setPdfUrl("");
-      return;
+    if (pdfMode === "upload" && pdfFile instanceof File) {
+      const url = URL.createObjectURL(pdfFile);
+      setPdfUrl(url);
+      return () => URL.revokeObjectURL(url);
     }
-    const url = URL.createObjectURL(pdfFile);
-    setPdfUrl(url);
-    return () => URL.revokeObjectURL(url);
+    setPdfUrl("");
   }, [pdfMode, pdfFile]);
 
-  // ---- Image Preview URL (file) ----
-  const [imgUrl, setImgUrl] = useState("");
   useEffect(() => {
-    if (thumbMode !== "upload" || !(thumbFile instanceof File)) {
-      setImgUrl("");
-      return;
+    if (thumbMode === "upload" && thumbFile instanceof File) {
+      const url = URL.createObjectURL(thumbFile);
+      setImgUrl(url);
+      return () => URL.revokeObjectURL(url);
     }
-    const url = URL.createObjectURL(thumbFile);
-    setImgUrl(url);
-    return () => URL.revokeObjectURL(url);
+    setImgUrl("");
   }, [thumbMode, thumbFile]);
 
-  const switchPdfMode = (mode) => {
-    setValue("pdfMode", mode);
-    // hide + clear the other input
-    if (mode === "upload") {
-      setValue("pdfLink", "");
-      clearErrors(["pdfLink"]);
-    } else {
-      setValue("pdfFile", null);
-      clearErrors(["pdfFile"]);
-      setPdfUrl("");
-    }
-  };
-
-  const switchThumbMode = (mode) => {
-    setValue("thumbMode", mode);
-    if (mode === "upload") {
-      setValue("thumbLink", "");
-      clearErrors(["thumbLink"]);
-    } else {
-      setValue("thumbFile", null);
-      clearErrors(["thumbFile"]);
-      setImgUrl("");
-    }
-  };
-
   const onSubmit = async (data) => {
-    const payload = {
-      pdf_title: data.name,
-      unit_id: unitId,
-    };
+    const payload = { pdf_title: data.name, unit_id: unitId };
 
     try {
       if (data.pdfMode === "upload") {
-        const fileName = await uploadPdf(data.pdfFile);
-        console.log(fileName);
-        if (fileName.status === "success") {
-          payload.pdf_url = fileName?.file_url;
+        const res = await uploadPdf(data.pdfFile);
+        if (res.status === "success") {
+          payload.pdf_url = res.file_url;
         } else {
-          toast.error(fileName.status);
+          toast.error(res.status);
           return;
         }
       } else {
         payload.pdf_url = data.pdfLink;
       }
+
       if (data.thumbMode === "upload") {
-        const fileName = await uploadImage(data.thumbFile);
-        console.log(fileName);
-        payload.pdf_image = fileName;
+        payload.pdf_image = await uploadImage(data.thumbFile);
       } else {
         payload.pdf_image = data.thumbLink;
       }
-      const response = await mutateAsync({ payload });
 
+      const response = await mutateAsync({ payload });
       if (response.status === "success") {
         toast.success(response.message);
         router.back();
@@ -203,264 +160,325 @@ export default function AddUnitPage() {
         toast.error(response.message);
       }
     } catch (error) {
-      console.log(error);
+      toast.error("Something went wrong");
     }
   };
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="flex mb-4 items-center gap-2">
+    <div className="min-h-screen pb-10">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
         <button
-          type="button"
           onClick={() => router.back()}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
         >
-          <ArrowLeft size={16} className="inline -mt-0.5 mr-1" />
-          Back
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back</span>
         </button>
       </div>
 
-      <BreadCrumb title="Add PDF" child="PDFs" parent="Add PDF" />
+      <BreadCrumb title="Add PDF" child="Add PDF" parent="Unit" />
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="mt-3 px-2 sm:px-4 grid gap-6"
-      >
-        <div className="rounded-2xl">
-          {/* Unit Title */}
-          <div className="my-1">
-            <div className="flex justify-between items-center">
-              <label className="text-sm font-medium">Unit Title</label>
+      {/* Form Card */}
+      <div className="mt-6">
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          {/* Card Header */}
+          <div className="bg-gradient-to-r from-teal-600 to-teal-600 p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+                <FileText className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Add New PDF</h2>
+                <p className="text-white/80 text-sm mt-1">
+                  Add a PDF document to your unit
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+            {/* PDF Title */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                PDF Title <span className="text-teal-500">*</span>
+              </label>
+              <input
+                {...register("name")}
+                placeholder="Enter PDF title..."
+                className={`w-full px-4 py-3 rounded-xl border-2 outline-none transition-all ${
+                  errors.name
+                    ? "border-teal-300 focus:border-teal-500"
+                    : "border-gray-200 focus:border-teal-500"
+                }`}
+              />
               {errors.name && (
-                <p className="text-sm !mb-0 text-red-600">
+                <p className="text-sm text-teal-600 mt-1">
                   {errors.name.message}
                 </p>
               )}
             </div>
-            <input
-              {...register("name")}
-              placeholder="Enter unit name"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-            />
-          </div>
 
-          {/* PDF Source Toggle */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">PDF Source</label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => switchPdfMode("upload")}
-                  className={`px-3 py-1 rounded-lg border text-sm ${
-                    pdfMode === "upload"
-                      ? "!bg-(--primary-color) !text-white"
-                      : "border-slate-200"
-                  }`}
-                >
-                  Upload
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchPdfMode("link")}
-                  className={`px-3 py-1 rounded-lg border text-sm ${
-                    pdfMode === "link"
-                      ? "!bg-(--primary-color) !text-white"
-                      : "border-slate-200"
-                  }`}
-                >
-                  Link
-                </button>
-              </div>
-            </div>
+            {/* PDF Source */}
+            <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  PDF File <span className="text-teal-500">*</span>
+                </label>
 
-            {/* Upload PDF */}
-            {pdfMode === "upload" && (
-              <div className="mt-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">
-                    Upload PDF file
-                  </span>
-                  {errors.pdfFile && (
-                    <p className="text-sm !mb-0 text-red-600">
-                      {errors.pdfFile.message}
-                    </p>
-                  )}
+                <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValue("pdfMode", "upload");
+                      setValue("pdfLink", "");
+                      clearErrors("pdfLink");
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                      pdfMode === "upload"
+                        ? "bg-teal-600 text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <Upload className="w-4 h-4" />
+                    Upload
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValue("pdfMode", "link");
+                      setValue("pdfFile", null);
+                      clearErrors("pdfFile");
+                      setPdfUrl("");
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                      pdfMode === "link"
+                        ? "bg-teal-600 text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <LinkIcon className="w-4 h-4" />
+                    URL
+                  </button>
                 </div>
+              </div>
 
+              {pdfMode === "upload" ? (
                 <Controller
                   control={control}
                   name="pdfFile"
                   render={({ field }) => (
-                    <input
-                      type="file"
-                      accept="application/pdf,.pdf"
-                      onChange={(e) =>
-                        field.onChange(e.target.files?.[0] ?? null)
-                      }
-                      className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                    />
+                    <div
+                      className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
+                        errors.pdfFile
+                          ? "border-teal-300 bg-teal-50"
+                          : "border-gray-300 hover:border-teal-400"
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        onChange={(e) =>
+                          field.onChange(e.target.files?.[0] ?? null)
+                        }
+                        className="hidden"
+                        id="pdf-upload"
+                      />
+                      <label
+                        htmlFor="pdf-upload"
+                        className="cursor-pointer block"
+                      >
+                        <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">
+                          {pdfFile instanceof File
+                            ? pdfFile.name
+                            : "Click to upload PDF file"}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">PDF only</p>
+                      </label>
+                    </div>
                   )}
                 />
-              </div>
-            )}
-
-            {/* PDF Link */}
-            {pdfMode === "link" && (
-              <div className="mt-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Paste PDF URL</span>
-                  {errors.pdfLink && (
-                    <p className="text-sm !mb-0 text-red-600">
-                      {errors.pdfLink.message}
-                    </p>
-                  )}
-                </div>
+              ) : (
                 <input
                   {...register("pdfLink")}
                   placeholder="https://example.com/file.pdf"
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                  className={`w-full px-4 py-3 rounded-xl border-2 outline-none transition-all ${
+                    errors.pdfLink
+                      ? "border-teal-300"
+                      : "border-gray-200 focus:border-teal-500"
+                  }`}
                 />
-              </div>
-            )}
+              )}
 
-            {/* PDF Preview (file OR link) */}
-            {(pdfUrl || (pdfMode === "link" && isValidUrl(pdfLink))) && (
-              <div className="mt-4 rounded-2xl border w-full place-self-center border-slate-200 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-                  <p className="text-sm">
-                    <span className="font-medium">Preview:</span>{" "}
-                    {pdfMode === "upload" && pdfFile instanceof File
-                      ? pdfFile.name
-                      : pdfLink}
-                  </p>
+              {(errors.pdfFile || errors.pdfLink) && (
+                <p className="text-sm text-teal-600 mt-2">
+                  {errors.pdfFile?.message || errors.pdfLink?.message}
+                </p>
+              )}
+
+              {/* PDF Preview */}
+              {(pdfUrl || (pdfMode === "link" && isValidUrl(pdfLink))) && (
+                <div className="mt-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Eye className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">
+                      Preview
+                    </span>
+                  </div>
+                  <iframe
+                    src={pdfMode === "upload" ? pdfUrl : pdfLink}
+                    className="w-full h-64 rounded-xl border border-gray-200"
+                    title="PDF Preview"
+                  />
                 </div>
-
-                <iframe
-                  src={pdfMode === "upload" ? pdfUrl : pdfLink}
-                  title="PDF Preview"
-                  className=" w-full place-self-center h-[30vh]"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Thumbnail (optional) */}
-          <div className="mt-8">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">
-                Thumbnail (optional)
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => switchThumbMode("upload")}
-                  className={`px-3 py-1 rounded-lg border text-sm ${
-                    thumbMode === "upload"
-                      ? "!bg-(--primary-color) !text-white"
-                      : "border-slate-200"
-                  }`}
-                >
-                  Upload
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchThumbMode("link")}
-                  className={`px-3 py-1 rounded-lg border text-sm ${
-                    thumbMode === "link"
-                      ? "!bg-(--primary-color) !text-white"
-                      : "border-slate-200"
-                  }`}
-                >
-                  Link
-                </button>
-              </div>
+              )}
             </div>
 
-            {thumbMode === "upload" && (
-              <div className="mt-2">
-                {errors.thumbFile && (
-                  <p className="text-sm !mb-0 text-red-600">
-                    {errors.thumbFile.message}
-                  </p>
-                )}
+            {/* Thumbnail */}
+            <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4" />
+                  Thumbnail <span className="text-teal-500">*</span>
+                </label>
+
+                <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValue("thumbMode", "upload");
+                      setValue("thumbLink", "");
+                      clearErrors("thumbLink");
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                      thumbMode === "upload"
+                        ? "bg-teal-600 text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <Upload className="w-4 h-4" />
+                    Upload
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValue("thumbMode", "link");
+                      setValue("thumbFile", null);
+                      clearErrors("thumbFile");
+                      setImgUrl("");
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                      thumbMode === "link"
+                        ? "bg-teal-600 text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <LinkIcon className="w-4 h-4" />
+                    URL
+                  </button>
+                </div>
+              </div>
+
+              {thumbMode === "upload" ? (
                 <Controller
                   control={control}
                   name="thumbFile"
                   render={({ field }) => (
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) =>
-                        field.onChange(e.target.files?.[0] ?? null)
-                      }
-                      className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                    />
+                    <div
+                      className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
+                        errors.thumbFile
+                          ? "border-teal-300 bg-teal-50"
+                          : "border-gray-300 hover:border-teal-400"
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          field.onChange(e.target.files?.[0] ?? null)
+                        }
+                        className="hidden"
+                        id="thumb-upload"
+                      />
+                      <label
+                        htmlFor="thumb-upload"
+                        className="cursor-pointer block"
+                      >
+                        <ImageIcon className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">
+                          Click to upload image
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          PNG, JPG, WebP
+                        </p>
+                      </label>
+                    </div>
                   )}
                 />
-              </div>
-            )}
-
-            {thumbMode === "link" && (
-              <div className="mt-2">
-                {errors.thumbLink && (
-                  <p className="text-sm !mb-0 text-red-600">
-                    {errors.thumbLink.message}
-                  </p>
-                )}
+              ) : (
                 <input
                   {...register("thumbLink")}
-                  placeholder="https://example.com/cover.jpg"
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
+                  placeholder="https://example.com/image.jpg"
+                  className={`w-full px-4 py-3 rounded-xl border-2 outline-none transition-all ${
+                    errors.thumbLink
+                      ? "border-teal-300"
+                      : "border-gray-200 focus:border-teal-500"
+                  }`}
                 />
-              </div>
-            )}
+              )}
 
-            {/* Thumbnail Preview */}
-            {(imgUrl || (thumbMode === "link" && isValidUrl(thumbLink))) && (
-              <div className="mt-4 rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-                  <p className="text-sm">
-                    <span className="font-medium">Thumbnail preview</span>
-                  </p>
+              {(errors.thumbFile || errors.thumbLink) && (
+                <p className="text-sm text-teal-600 mt-2">
+                  {errors.thumbFile?.message || errors.thumbLink?.message}
+                </p>
+              )}
+
+              {/* Thumbnail Preview */}
+              {(imgUrl || (thumbMode === "link" && isValidUrl(thumbLink))) && (
+                <div className="mt-4">
+                  <img
+                    src={thumbMode === "upload" ? imgUrl : thumbLink}
+                    alt="Thumbnail"
+                    className="w-full h-40 object-cover rounded-xl border border-gray-200"
+                  />
                 </div>
-                <img
-                  src={thumbMode === "upload" ? imgUrl : thumbLink}
-                  alt="Thumbnail Preview"
-                  className="w-full max-h-[150px] object-contain bg-white"
-                />
-              </div>
-            )}
-          </div>
-        </div>
+              )}
+            </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-3 mt-6">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] !text-white px-4 py-2 font-medium hover:opacity-90 disabled:opacity-60"
-          >
-            {isSubmitting ? (
-              "Saving..."
-            ) : (
-              <>
-                {" "}
-                <Save size={18} />
-                Save Unit
-              </>
-            )}
-          </button>
+            {/* Actions */}
+            <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-600 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-teal-200 transition-all disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    Save PDF
+                  </>
+                )}
+              </button>
 
-          <button
-            type="button"
-            onClick={() => router.push(`/courses/${course?.id}`)}
-            className="rounded-xl border border-slate-200 px-4 py-2 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="px-6 py-3 border border-gray-200 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

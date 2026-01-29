@@ -2,8 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { courses } from "@/utils/data";
-import { ArrowLeft, Pencil, Plus, Save, X } from "lucide-react";
+import { ArrowLeft, Save, BookOpen, Loader2 } from "lucide-react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import axios from "axios";
 import { BASE_URL } from "../../../../../utils/base_url";
@@ -12,210 +11,133 @@ import toast from "react-hot-toast";
 export default function AddUnitPage() {
   const { unitId } = useParams();
   const router = useRouter();
-  const [openDeleteModal, setOpenDeleteModal] = useState(false);
-
-  const [course, setCourse] = useState(
-    courses?.find((c) => c.id === parseInt(unitId))
-  );
-  const [unit, setUnit] = useState({
-    name: "",
-    unitNumber: course?.units?.length + 1 || 1,
-    lessonsCount: 0,
-    videos: [""],
-    pdfs: [""],
-  });
-
-  const handleInputChange = (e, field) => {
-    const { value } = e.target;
-    setUnit((prevUnit) => ({ ...prevUnit, [field]: value }));
-  };
-
-  const handleArrayChange = (e, field, index) => {
-    const { value } = e.target;
-    const updatedArray = [...unit[field]];
-    updatedArray[index] = value;
-    setUnit((prevUnit) => ({ ...prevUnit, [field]: updatedArray }));
-  };
-
-  const addNewVideo = () => {
-    setUnit((prevUnit) => ({ ...prevUnit, videos: [...prevUnit.videos, ""] }));
-  };
-
-  const addNewPdf = () => {
-    setUnit((prevUnit) => ({ ...prevUnit, pdfs: [...prevUnit.pdfs, ""] }));
-  };
-
-  const removeVideo = (index) => {
-    const updatedVideos = unit.videos.filter((_, i) => i !== index);
-    setUnit((prevUnit) => ({ ...prevUnit, videos: updatedVideos }));
-  };
-
-  const removePdf = (index) => {
-    const updatedPdfs = unit.pdfs.filter((_, i) => i !== index);
-    setUnit((prevUnit) => ({ ...prevUnit, pdfs: updatedPdfs }));
-  };
-
+  const [unitName, setUnitName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem("AccessToken");
+  const [error, setError] = useState("");
 
-    // Validate fields
-    if (!unit.name) {
-      alert("Please fill out all fields before submitting.");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!unitName.trim()) {
+      setError("Unit name is required");
       return;
     }
-    const data_send = {
-      unit_title: unit?.name,
-      course_id: unitId,
-    };
+
+    const token = localStorage.getItem("AccessToken");
     setIsLoading(true);
-    axios
-      .post(BASE_URL + "/units/add_unit.php", data_send, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      .then((res) => {
-        if (res?.data?.status == "success") {
-          toast.success(res?.data?.message);
-          router.push(`/courses/units/${unitId}`);
-          setUnit({ name: "" });
-        } else {
-          toast.error(res?.data?.message);
-        }
-      })
-      .catch((e) => console.log(e))
-      .finally(() => setIsLoading(false));
+    setError("");
+
+    try {
+      const res = await axios.post(
+        BASE_URL + "/units/add_unit.php",
+        { unit_title: unitName, course_id: unitId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res?.data?.status === "success") {
+        toast.success(res?.data?.message);
+        router.push(`/courses/units/${unitId}`);
+      } else {
+        toast.error(res?.data?.message);
+      }
+    } catch (e) {
+      toast.error("Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="flex mb-4 items-center gap-2">
+    <div className="min-h-screen pb-10">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
         <button
-          type="button"
           onClick={() => router.back()}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
         >
-          <ArrowLeft size={16} className="inline -mt-0.5 mr-1" />
-          Back
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back</span>
         </button>
       </div>
 
-      <BreadCrumb title="Add Unit" child="Units" parent="Course" />
+      <BreadCrumb title="Add Unit" child="Add Unit" parent="Units" />
 
-      <form onSubmit={handleSubmit} className="mt-3 px-2 sm:px-4  grid gap-6">
-        <div className="rounded-2xl">
-          <div className="mt-4">
-            <label className="text-sm font-medium">Unit Name</label>
-            <input
-              value={unit.name}
-              onChange={(e) => handleInputChange(e, "name")}
-              placeholder="Enter unit name"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-            />
+      {/* Form Card */}
+      <div className="mt-6">
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          {/* Card Header */}
+          <div className="bg-gradient-to-r from-teal-600 to-cyan-600 p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+                <BookOpen className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Add New Unit</h2>
+                <p className="text-white/80 text-sm mt-1">
+                  Create a new unit for your course
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* Unit Lessons Count */}
-          {/* <div className="mt-4">
-            <label className="text-sm font-medium">Lessons Count</label>
-            <input
-              type="number"
-onWheel={(e) => e.target.blur()}
-              value={unit.lessonsCount}
-              onChange={(e) => handleInputChange(e, "lessonsCount")}
-              min={1}
-              placeholder="Enter number of lessons"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-            />
-          </div> */}
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Unit Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                value={unitName}
+                onChange={(e) => {
+                  setUnitName(e.target.value);
+                  setError("");
+                }}
+                placeholder="Enter unit name..."
+                className={`w-full px-4 py-3 rounded-xl border-2 outline-none transition-all ${
+                  error
+                    ? "border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                    : "border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
+                }`}
+              />
+              {error && (
+                <p className="text-sm text-rose-600 mt-2 flex items-center gap-1">
+                  <span className="w-1 h-1 bg-rose-500 rounded-full" />
+                  {error}
+                </p>
+              )}
+            </div>
 
-          {/* Unit Videos */}
-          {/* <div className="mt-4">
-            <label className="text-sm font-medium">Unit Videos</label>
-            {unit.videos.map((video, index) => (
-              <div key={index} className="flex items-center gap-3 mt-2">
-                <input
-                  type="text"
-                  value={video}
-                  onChange={(e) => handleArrayChange(e, "videos", index)}
-                  placeholder="Enter video Code"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeVideo(index)}
-                  className="rounded-full border border-slate-200 p-2"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addNewVideo}
-              className="mt-2 inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-3 py-2 text-sm hover:opacity-90"
-            >
-              <Plus size={16} /> Add Video
-            </button>
-          </div> */}
+            {/* Actions */}
+            <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-teal-200 transition-all disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    Save Unit
+                  </>
+                )}
+              </button>
 
-          {/* Unit PDFs */}
-          {/* <div className="mt-4">
-            <label className="text-sm font-medium">Unit PDFs</label>
-            {unit.pdfs.map((pdf, index) => (
-              <div key={index} className="flex items-center gap-3 mt-2">
-                <input
-                  type="file"
-                  value={pdf}
-                  onChange={(e) => handleArrayChange(e, "pdfs", index)}
-                  placeholder="Enter PDF URL"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:ring-2 ring-[var(--primary-color)]"
-                />
-                <button
-                  type="button"
-                  onClick={() => removePdf(index)}
-                  className="rounded-full border border-slate-200 p-2"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addNewPdf}
-              className="mt-2 inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-3 py-2 text-sm hover:opacity-90"
-            >
-              <Plus size={16} /> Add PDF
-            </button>
-          </div> */}
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="px-6 py-3 border border-gray-200 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-color)] text-white px-4 py-2 font-medium hover:opacity-90"
-          >
-            {isLoading ? (
-              "Loading...."
-            ) : (
-              <div className="flex gap-1 items-center">
-                {" "}
-                <Save size={18} />
-                Save Unit
-              </div>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(`/courses/${course.id}`)}
-            className="rounded-xl border border-slate-200 px-4 py-2 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

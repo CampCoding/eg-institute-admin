@@ -1,6 +1,7 @@
+// app/courses/units/[unitId]/unit-detail/[detailId]/page.jsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Plus,
@@ -12,6 +13,15 @@ import {
   EyeClosed,
   Navigation2,
   BookCheck,
+  Users,
+  FileCheck,
+  Clock,
+  Video,
+  FileText,
+  HelpCircle,
+  MoreVertical,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
 import DeleteModal from "@/components/DeleteModal/DeleteModal";
@@ -22,9 +32,9 @@ import useGetAllUnitPdfs from "@/utils/Api/Units/GetAllPdfs";
 import { Toggle } from "@/utils/Api/Toggle";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-
-import useDeleteContent from "@/utils/Api/Units/DeletePdf"; // hook اللي فوق
-import useGetAllUnitQuizzes from "../../../../../../utils/Api/Units/GetAllQuizzesUnit";
+import useDeleteContent from "@/utils/Api/Units/DeletePdf";
+import useGetAllUnitQuizzes from "@/utils/Api/Units/GetAllQuizzesUnit";
+import { Dropdown, Tooltip } from "antd";
 
 const fmtMinutes = (mins = 0) => {
   const h = Math.floor(mins / 60);
@@ -34,233 +44,373 @@ const fmtMinutes = (mins = 0) => {
   return `${m}m`;
 };
 
-const ActionButton = ({ icon: Icon, onClick, className, title }) => (
+// Tab Button Component
+const TabButton = ({ active, onClick, icon: Icon, label, count }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`p-2 rounded-lg transition-all hover:scale-105 ${className}`}
-    title={title}
+    className={`relative flex items-center gap-2 px-6 py-3.5 rounded-xl font-semibold transition-all ${
+      active
+        ? "bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-teal-200"
+        : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+    }`}
   >
-    <Icon size={16} />
+    <Icon className="w-5 h-5" />
+    <span>{label}</span>
+    <span
+      className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+        active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {count}
+    </span>
   </button>
 );
 
+// Video Item Component
 const VideoItem = ({ video, onEdit, onDelete, onView, onForceDelete }) => {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all duration-200 group">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="bg-gradient-to-br from-teal-500 to-teal-800 p-3 rounded-xl shadow-lg">
-            {video.video_image ? (
-              <div className="relative">
-                <div
-                  className={`!bg-rose-300 mx-1 absolute ${
-                    video.hidden !== "0" ? "flex" : "hidden"
-                  } py-1 px-2 !rounded-lg !text-white justify-center items-center text-sm font-medium`}
-                >
-                  Hidden
-                </div>
-                <img
-                  src={video.video_image}
-                  alt={video.video_title}
-                  className="object-cover max-h-[150px] max-w-[100px] h-[100px] rounded-xl"
-                />
-              </div>
-            ) : (
-              <Play className="text-white" size={24} />
-            )}
-          </div>
+  const isHidden = video.hidden !== "0";
 
-          <div className="flex-1">
-            <h3 className="font-semibold text-gray-900 text-lg mb-1">
-              {video.video_title || "Untitled Video"}
-            </h3>
-            <div className="flex items-center gap-4 text-sm text-gray-500">
-              <span className="flex items-center gap-1">
-                <Play size={14} />
-                Duration: {fmtMinutes(video.duration)}
+  return (
+    <div
+      className={`bg-white rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-lg group ${
+        isHidden ? "border-rose-200 bg-rose-50/30" : "border-gray-100"
+      }`}
+    >
+      <div className="flex flex-col sm:flex-row">
+        {/* Thumbnail */}
+        <div className="relative w-full sm:w-48 h-32 sm:h-auto flex-shrink-0">
+          {video.video_image ? (
+            <img
+              src={video.video_image}
+              alt={video.video_title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <Play className="w-10 h-10 text-white" fill="white" />
+            </div>
+          )}
+
+          {isHidden && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <span className="text-xs font-medium text-white bg-rose-500 px-3 py-1 rounded-full">
+                Hidden
               </span>
             </div>
-          </div>
+          )}
+
+          {/* Duration Badge */}
+          {video.duration && (
+            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-lg flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {fmtMinutes(video.duration)}
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ActionButton
-            icon={Navigation2}
-            onClick={() => onView(video)}
-            className="bg-blue-50 text-blue-600 hover:bg-blue-100"
-            title="View Video"
-          />
-          <ActionButton
-            icon={Edit2}
-            onClick={() => onEdit(video)}
-            className="bg-amber-50 text-amber-600 hover:bg-amber-100"
-            title="Edit Video"
-          />
-          <ActionButton
-            onClick={() => onDelete(video)}
-            icon={video.hidden === "0" ? Eye : EyeClosed}
-            className="bg-teal-50 text-(--primary-color) hover:bg-teal-100"
-            title={`${video.hidden === "0" ? "Hide" : "Show"} Video`}
-          />
-          <ActionButton
-            icon={Trash2}
-            onClick={() => onForceDelete(video)}
-            className="bg-red-50 text-red-600 hover:bg-red-100"
-            title="Delete Video"
-          />
+        {/* Content */}
+        <div className="flex-1 p-4 flex flex-col justify-between">
+          <div>
+            <h3 className="font-semibold text-gray-900 text-lg line-clamp-1">
+              {video.video_title || "Untitled Video"}
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Video ID: {video.video_player_id || "N/A"}
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 mt-3 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <ActionButton
+              icon={Navigation2}
+              onClick={() => onView(video)}
+              className="bg-blue-50 text-blue-600 hover:bg-blue-100"
+              title="View"
+            />
+            <ActionButton
+              icon={Edit2}
+              onClick={() => onEdit(video)}
+              className="bg-amber-50 text-amber-600 hover:bg-amber-100"
+              title="Edit"
+            />
+            <ActionButton
+              icon={isHidden ? Eye : EyeClosed}
+              onClick={() => onDelete(video)}
+              className="bg-teal-50 text-teal-600 hover:bg-teal-100"
+              title={isHidden ? "Show" : "Hide"}
+            />
+            <ActionButton
+              icon={Trash2}
+              onClick={() => onForceDelete(video)}
+              className="bg-rose-50 text-rose-600 hover:bg-rose-100"
+              title="Delete"
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const PdfItem = ({ pdf, onEdit, onDelete, onView, onForceDelete }) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all duration-200 group">
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-4 flex-1">
-        <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-3 rounded-xl shadow-lg">
-          {pdf.pdf_image ? (
-            <div className="relative">
-              <div
-                className={`!bg-rose-300 mx-1 absolute ${
-                  pdf.hidden !== "0" ? "flex" : "hidden"
-                } py-1 px-2 !rounded-lg !text-white justify-center items-center text-sm font-medium`}
-              >
-                Hidden
-              </div>
-              <img
-                src={pdf.pdf_image}
-                alt={pdf.pdf_title}
-                className="object-cover max-h-[150px] max-w-[100px] h-[100px] rounded-xl"
-              />
-            </div>
-          ) : (
-            <BookOpen className="text-white" size={24} />
-          )}
-        </div>
+// PDF Item Component
+const PdfItem = ({ pdf, onEdit, onDelete, onView, onForceDelete }) => {
+  const isHidden = pdf.hidden !== "0";
 
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 text-lg mb-1">
-            {pdf.pdf_title || "Untitled PDF"}
-          </h3>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <ActionButton
-          icon={Eye}
-          onClick={() => onView(pdf)}
-          className="bg-blue-50 text-blue-600 hover:bg-blue-100"
-          title="View PDF"
-        />
-        <ActionButton
-          icon={Edit2}
-          onClick={() => onEdit(pdf)}
-          className="bg-amber-50 text-amber-600 hover:bg-amber-100"
-          title="Edit PDF"
-        />
-        <ActionButton
-          onClick={() => onDelete(pdf)}
-          icon={pdf.hidden === "0" ? Eye : EyeClosed}
-          className="bg-teal-50 text-(--primary-color) hover:bg-teal-100"
-          title={`${pdf.hidden === "0" ? "Hide" : "Show"} PDF`}
-        />
-        <ActionButton
-          icon={Trash2}
-          onClick={() => onForceDelete(pdf)}
-          className="bg-red-50 text-red-600 hover:bg-red-100"
-          title="Delete PDF"
-        />
-      </div>
-    </div>
-  </div>
-);
-
-const QuizItem = ({ quiz, onEdit, onDelete, onView, onForceDelete }) => (
-  <div className="bg-white rounded-xl relative shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all duration-200 group">
+  return (
     <div
-      className={`absolute ${
-        quiz.hidden !== "0" ? "flex" : "hidden"
-      } mx-2 mt-1 bg-rose-400 top-[25%] right-[45%] !rounded-2xl !-translate-x-0`}
+      className={`bg-white rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-lg group ${
+        isHidden ? "border-rose-200 bg-rose-50/30" : "border-gray-100"
+      }`}
     >
-      <span className="px-2 py-1 text-white text-sm font-medium">
-        {quiz.hidden === "0" ? null : "Hidden"}
-      </span>
-    </div>
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-4 flex-1">
-        <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-3 rounded-xl shadow-lg">
-          {quiz.quiz_image ? (
-            <div className="relative">
-              <div
-                className={`!bg-rose-300 mx-1 absolute ${
-                  quiz.hidden !== "0" ? "flex" : "hidden"
-                } py-1 px-2 !rounded-lg !text-white justify-center items-center text-sm font-medium`}
-              >
-                Hidden
-              </div>
-              <img
-                src={quiz.quiz_image}
-                alt={quiz.quiz_title}
-                className="object-cover max-h-[150px] max-w-[100px] h-[100px] rounded-xl"
-              />
-            </div>
+      <div className="flex flex-col sm:flex-row">
+        {/* Thumbnail */}
+        <div className="relative w-full sm:w-48 h-32 sm:h-auto flex-shrink-0">
+          {pdf.pdf_image ? (
+            <img
+              src={pdf.pdf_image}
+              alt={pdf.pdf_title}
+              className="w-full h-full object-cover"
+            />
           ) : (
-            <BookCheck className="text-white" size={24} />
+            <div className="w-full h-full bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center">
+              <FileText className="w-10 h-10 text-white" />
+            </div>
+          )}
+
+          {isHidden && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <span className="text-xs font-medium text-white bg-rose-500 px-3 py-1 rounded-full">
+                Hidden
+              </span>
+            </div>
           )}
         </div>
 
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 text-lg mb-1">
-            {quiz.quiz_title || quiz.title || "Untitled Quiz"}
-          </h3>
+        {/* Content */}
+        <div className="flex-1 p-4 flex flex-col justify-between">
+          <div>
+            <h3 className="font-semibold text-gray-900 text-lg line-clamp-1">
+              {pdf.pdf_title || "Untitled PDF"}
+            </h3>
+            <p className="text-sm text-gray-500 mt-1 line-clamp-1">
+              {pdf.pdf_url || "No URL"}
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 mt-3 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <ActionButton
+              icon={Eye}
+              onClick={() => onView(pdf)}
+              className="bg-blue-50 text-blue-600 hover:bg-blue-100"
+              title="View"
+            />
+            <ActionButton
+              icon={Edit2}
+              onClick={() => onEdit(pdf)}
+              className="bg-amber-50 text-amber-600 hover:bg-amber-100"
+              title="Edit"
+            />
+            <ActionButton
+              icon={isHidden ? Eye : EyeClosed}
+              onClick={() => onDelete(pdf)}
+              className="bg-teal-50 text-teal-600 hover:bg-teal-100"
+              title={isHidden ? "Show" : "Hide"}
+            />
+            <ActionButton
+              icon={Trash2}
+              onClick={() => onForceDelete(pdf)}
+              className="bg-rose-50 text-rose-600 hover:bg-rose-100"
+              title="Delete"
+            />
+          </div>
         </div>
       </div>
+    </div>
+  );
+};
 
-      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <ActionButton
-          icon={Eye}
-          onClick={() => onView(quiz)}
-          className="bg-blue-50 text-blue-600 hover:bg-blue-100"
-          title="View Quiz"
-        />
-        <ActionButton
-          icon={Edit2}
-          onClick={() => onEdit(quiz)}
-          className="bg-amber-50 text-amber-600 hover:bg-amber-100"
-          title="Edit Quiz"
-        />
-        <ActionButton
-          onClick={() => onDelete(quiz)}
-          icon={quiz.hidden === "0" ? Eye : EyeClosed}
-          className="bg-teal-50 text-(--primary-color) hover:bg-teal-100"
-          title={`${quiz.hidden === "0" ? "Hide" : "Show"} Quiz`}
-        />
-        <ActionButton
-          icon={Trash2}
-          onClick={() => onForceDelete(quiz)}
-          className="bg-red-50 text-red-600 hover:bg-red-100"
-          title="Delete Quiz"
-        />
+// Quiz Item Component with Solved Quizzes Button
+const QuizItem = ({
+  quiz,
+  onEdit,
+  onDelete,
+  onView,
+  onForceDelete,
+  onViewSolved,
+}) => {
+  const isHidden = quiz.hidden !== "0";
+
+  const menuItems = [
+    {
+      key: "view",
+      label: "View Quiz",
+      icon: <Eye className="w-4 h-4" />,
+      onClick: () => onView(quiz),
+    },
+    {
+      key: "solved",
+      label: "View Solved Quizzes",
+      icon: <FileCheck className="w-4 h-4" />,
+      onClick: () => onViewSolved(quiz),
+    },
+    {
+      key: "edit",
+      label: "Edit Quiz",
+      icon: <Edit2 className="w-4 h-4" />,
+      onClick: () => onEdit(quiz),
+    },
+    {
+      key: "toggle",
+      label: isHidden ? "Show Quiz" : "Hide Quiz",
+      icon: isHidden ? (
+        <Eye className="w-4 h-4" />
+      ) : (
+        <EyeClosed className="w-4 h-4" />
+      ),
+      onClick: () => onDelete(quiz),
+    },
+    {
+      type: "divider",
+    },
+    {
+      key: "delete",
+      label: "Delete Quiz",
+      icon: <Trash2 className="w-4 h-4" />,
+      danger: true,
+      onClick: () => onForceDelete(quiz),
+    },
+  ];
+
+  return (
+    <div
+      className={`bg-white rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-lg group ${
+        isHidden ? "border-rose-200 bg-rose-50/30" : "border-gray-100"
+      }`}
+    >
+      <div className="flex flex-col sm:flex-row">
+        {/* Icon */}
+        <div className="relative w-full sm:w-48 h-32 sm:h-auto flex-shrink-0">
+          {quiz.quiz_image ? (
+            <img
+              src={quiz.quiz_image}
+              alt={quiz.quiz_title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+              <HelpCircle className="w-10 h-10 text-white" />
+            </div>
+          )}
+
+          {isHidden && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <span className="text-xs font-medium text-white bg-rose-500 px-3 py-1 rounded-full">
+                Hidden
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-4 flex flex-col justify-between">
+          <div>
+            <h3 className="font-semibold text-gray-900 text-lg line-clamp-1">
+              {quiz.quiz_title || quiz.title || "Untitled Quiz"}
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Quiz ID: {quiz.quiz_id}
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 mt-3">
+            {/* View Solved Button - Always Visible */}
+            <button
+              onClick={() => onViewSolved(quiz)}
+              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-purple-200 transition-all"
+            >
+              <FileCheck className="w-4 h-4" />
+              <span className="hidden sm:inline">Solved Quizzes</span>
+            </button>
+
+            {/* Other Actions */}
+            <div className="flex items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+              <ActionButton
+                icon={Eye}
+                onClick={() => onView(quiz)}
+                className="bg-blue-50 text-blue-600 hover:bg-blue-100"
+                title="View"
+              />
+              <ActionButton
+                icon={Edit2}
+                onClick={() => onEdit(quiz)}
+                className="bg-amber-50 text-amber-600 hover:bg-amber-100"
+                title="Edit"
+              />
+              <ActionButton
+                icon={isHidden ? Eye : EyeClosed}
+                onClick={() => onDelete(quiz)}
+                className="bg-teal-50 text-teal-600 hover:bg-teal-100"
+                title={isHidden ? "Show" : "Hide"}
+              />
+              <ActionButton
+                icon={Trash2}
+                onClick={() => onForceDelete(quiz)}
+                className="bg-rose-50 text-rose-600 hover:bg-rose-100"
+                title="Delete"
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+  );
+};
+
+// Action Button Component
+const ActionButton = ({ icon: Icon, onClick, className, title }) => (
+  <Tooltip title={title}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`p-2.5 rounded-xl transition-all hover:scale-105 ${className}`}
+    >
+      <Icon className="w-4 h-4" />
+    </button>
+  </Tooltip>
+);
+
+// Empty State Component
+const EmptyState = ({ icon: Icon, title, description, onAdd, addLabel }) => (
+  <div className="text-center py-16 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <Icon className="w-10 h-10 text-gray-400" />
+    </div>
+    <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+    <p className="text-gray-500 mt-1">{description}</p>
+    <button
+      type="button"
+      onClick={onAdd}
+      className="mt-4 inline-flex items-center gap-2 text-teal-600 hover:text-teal-700 font-medium"
+    >
+      <Plus className="w-4 h-4" />
+      {addLabel}
+    </button>
   </div>
 );
 
-export default function Page() {
+export default function UnitDetailPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { unitId, detailId } = useParams();
-  console.log({ unitId, detailId });
 
   const { unit: unitData } = useSelector((state) => state.Units);
 
-  const [activeTab, setActiveTab] = useState("videos"); // videos | pdfs | quizzes
-
-  // modal state
+  const [activeTab, setActiveTab] = useState("videos");
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
-  const [deleteType, setDeleteType] = useState("pdf"); // pdf | video | quiz
+  const [deleteType, setDeleteType] = useState("pdf");
   const [rowData, setRowData] = useState(null);
 
   const { data: VideoData, isLoading: isVideoLoading } = useGetAllUnitVideos({
@@ -273,16 +423,14 @@ export default function Page() {
     detailId,
     type: "Unit",
   });
-  console.log(VideoData);
 
-  // delete mutation (invalidate حسب tab)
   const { mutateAsync, isPending } = useDeleteContent({
     queryKey:
       activeTab === "videos"
         ? "unitVideos"
         : activeTab === "pdfs"
-        ? "unitPdfs"
-        : "unitquizs",
+          ? "unitPdfs"
+          : "unitquizs",
   });
 
   const handleAddNew = () => {
@@ -295,12 +443,8 @@ export default function Page() {
 
   const handleView = (item) => {
     if (activeTab === "pdfs") window.open(item.pdf_url, "_blank");
-    else if (activeTab === "videos")
-      window.open(item.video_url, "_blank"); // عدّل لو اسم الحقل مختلف
-    else {
-      // view quiz route (عدّل حسب مشروعك)
-      window.open(item.quiz_url, "_blank");
-    }
+    else if (activeTab === "videos") window.open(item.video_url, "_blank");
+    else window.open(item.quiz_url, "_blank");
   };
 
   const handleEdit = (item) => {
@@ -316,54 +460,56 @@ export default function Page() {
     }
   };
 
-  // hide/show toggle
+  // ✅ Navigate to Solved Quizzes Page
+  const handleViewSolvedQuizzes = (quiz) => {
+    router.push(
+      `/courses/units/${unitId}/unit-detail/${detailId}/solved-quizzes/${quiz.quiz_id}`
+    );
+  };
+
   const handleToggle = async (item) => {
     try {
+      let response;
       if (activeTab === "pdfs") {
-        const response = await Toggle({
+        response = await Toggle({
           payload: { pdf_id: item.pdf_id },
           url: "units/content/pdfs/toggle_show_pdf.php",
           key: ["unitPdfs", "Unit", detailId],
           queryClient,
         });
-        if (response.status === "success") {
-          queryClient.invalidateQueries(["unitPdfs", "Unit", detailId]);
-          toast.success(response.message);
-        } else {
-          toast.error(response.message);
-        }
       } else if (activeTab === "videos") {
-        const response = await Toggle({
+        response = await Toggle({
           payload: { video_id: item.video_id },
           url: "units/content/videos/toggle_show_hide.php",
           key: "unitVideos",
           queryClient,
         });
-        if (response.status === "success") {
-          queryClient.invalidateQueries(["unitVideos", "Unit", detailId]);
-          toast.success(response.message);
-        } else {
-          toast.error(response.message);
-        }
       } else {
-        // ✅ عدّل URL لو مختلف عندك
-        const response = await Toggle({
+        response = await Toggle({
           payload: { quiz_id: String(item?.quiz_id) },
           url: "units/content/quiz/toggle_show_quiz.php",
           key: "unitquizs",
           queryClient,
         });
-
-        if (response.status === "success") {
-          toast.success(response.message);
-        } else {
-          toast.error(response.message);
-        }
       }
-    } catch (e) {}
+
+      if (response.status === "success") {
+        toast.success(response.message);
+        queryClient.invalidateQueries([
+          activeTab === "videos"
+            ? "unitVideos"
+            : activeTab === "pdfs"
+              ? "unitPdfs"
+              : "unitquizs",
+        ]);
+      } else {
+        toast.error(response.message);
+      }
+    } catch (e) {
+      toast.error("Something went wrong");
+    }
   };
 
-  // open modal
   const handleForceDeleteOpen = (item) => {
     setRowData(item);
     setDeleteType(
@@ -372,7 +518,6 @@ export default function Page() {
     setOpenDeleteModal(true);
   };
 
-  // confirm delete
   const handleForceDeleteConfirm = async () => {
     if (!rowData) return;
 
@@ -380,12 +525,11 @@ export default function Page() {
       deleteType === "video"
         ? rowData.video_id
         : deleteType === "pdf"
-        ? rowData.pdf_id
-        : rowData.quiz_id;
+          ? rowData.pdf_id
+          : rowData.quiz_id;
 
     try {
       const res = await mutateAsync({ id, type: deleteType });
-
       if (res?.status === "success") {
         toast.success(res.message || "Deleted successfully");
         setOpenDeleteModal(false);
@@ -394,14 +538,17 @@ export default function Page() {
         toast.error(res?.message || "Delete failed");
       }
     } catch (e) {
-      toast.error(e?.message || "Delete failed");
+      toast.error("Delete failed");
     }
   };
 
   if (isVideoLoading || isPdfLoading || isQuizLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Loading content...</p>
+        </div>
       </div>
     );
   }
@@ -409,206 +556,178 @@ export default function Page() {
   const videos = VideoData?.message ?? [];
   const pdfs = PdfData?.message ?? [];
   const quizzes = QuizData?.message ?? [];
-  console.log(quizzes);
 
   return (
-    <div className="min-h-screen">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="flex justify-between items-center mb-6">
+    <div className="min-h-screen pb-10">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <button
-            type="button"
             onClick={() => router.back()}
-            className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
           >
-            <ArrowLeft size={16} />
-            Back
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back</span>
           </button>
 
           <button
-            type="button"
             onClick={handleAddNew}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-teal-500 to-teal-700 !text-white px-6 py-2 hover:from-teal-700 hover:to-teal-800 transition-all shadow-md hover:shadow-lg"
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-teal-200 transition-all"
           >
-            <Plus size={16} />
-            Add {activeTab.slice(0, -1)}
+            <Plus className="w-4 h-4" />
+            <span>
+              Add{" "}
+              {activeTab === "videos"
+                ? "Video"
+                : activeTab === "pdfs"
+                  ? "PDF"
+                  : "Quiz"}
+            </span>
           </button>
         </div>
 
         <BreadCrumb
-          title={`Details of ${unitData?.unit_title}` || "Unit Details"}
+          title="Unit Details"
           parent="Courses"
-          child="Units"
+          child="Unit Content"
         />
 
+        {/* Stats Cards */}
+        <div className="mt-6 grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+              <Video className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {videos.length}
+              </p>
+              <p className="text-sm text-gray-500">Videos</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center">
+              <FileText className="w-6 h-6 text-rose-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{pdfs.length}</p>
+              <p className="text-sm text-gray-500">PDFs</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+              <HelpCircle className="w-6 h-6 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {quizzes.length}
+              </p>
+              <p className="text-sm text-gray-500">Quizzes</p>
+            </div>
+          </div>
+        </div>
+
         {/* Tabs */}
-        <div className="flex gap-4 mt-4 justify-center mb-8">
-          <button
-            type="button"
+        <div className="flex flex-wrap gap-3 justify-center mt-8 mb-8">
+          <TabButton
+            active={activeTab === "videos"}
             onClick={() => setActiveTab("videos")}
-            className={`relative py-3 px-8 rounded-xl font-semibold text-lg transition-all ${
-              activeTab === "videos"
-                ? "bg-gradient-to-r from-teal-500 to-teal-700 !text-white shadow-lg"
-                : "bg-white text-gray-600 hover:text-(--primary-color)"
-            }`}
-          >
-            <Play size={20} className="inline-block mr-2" />
-            Videos ({videos.length})
-          </button>
-
-          <button
-            type="button"
+            icon={Play}
+            label="Videos"
+            count={videos.length}
+          />
+          <TabButton
+            active={activeTab === "pdfs"}
             onClick={() => setActiveTab("pdfs")}
-            className={`relative py-3 px-8 rounded-xl font-semibold text-lg transition-all ${
-              activeTab === "pdfs"
-                ? "bg-gradient-to-r from-teal-500 to-teal-700 !text-white shadow-lg"
-                : "bg-white text-gray-600 hover:text-(--primary-color)"
-            }`}
-          >
-            <BookOpen size={20} className="inline-block mr-2" />
-            PDFs ({pdfs.length})
-          </button>
-
-          <button
-            type="button"
+            icon={BookOpen}
+            label="PDFs"
+            count={pdfs.length}
+          />
+          <TabButton
+            active={activeTab === "quizzes"}
             onClick={() => setActiveTab("quizzes")}
-            className={`relative py-3 px-8 rounded-xl font-semibold text-lg transition-all ${
-              activeTab === "quizzes"
-                ? "bg-gradient-to-r from-teal-500 to-teal-700 !text-white shadow-lg"
-                : "bg-white text-gray-600 hover:text-(--primary-color)"
-            }`}
-          >
-            <BookCheck size={20} className="inline-block mr-2" />
-            Quizzes ({quizzes.length})
-          </button>
+            icon={BookCheck}
+            label="Quizzes"
+            count={quizzes.length}
+          />
         </div>
 
         {/* Content */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {activeTab === "videos" && (
             <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                  <div className="bg-gradient-to-br from-teal-500 to-teal-800 p-2 rounded-lg">
-                    <Play className="text-white" size={24} fill="white" />
-                  </div>
-                  Video Content
-                </h2>
-              </div>
-
               {videos.length > 0 ? (
-                <div className="grid gap-4">
-                  {videos.map((video) => (
-                    <VideoItem
-                      key={video.video_id}
-                      video={video}
-                      onView={handleView}
-                      onEdit={handleEdit}
-                      onDelete={handleToggle}
-                      onForceDelete={handleForceDeleteOpen}
-                    />
-                  ))}
-                </div>
+                videos.map((video) => (
+                  <VideoItem
+                    key={video.video_id}
+                    video={video}
+                    onView={handleView}
+                    onEdit={handleEdit}
+                    onDelete={handleToggle}
+                    onForceDelete={handleForceDeleteOpen}
+                  />
+                ))
               ) : (
-                <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
-                  <Play className="mx-auto mb-4 text-gray-400" size={48} />
-                  <p className="text-gray-500 text-lg">
-                    No videos available for this unit.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleAddNew}
-                    className="mt-4 inline-flex items-center gap-2 text-(--primary-color) hover:text-teal-700 font-medium"
-                  >
-                    <Plus size={16} />
-                    Add your first video
-                  </button>
-                </div>
+                <EmptyState
+                  icon={Play}
+                  title="No videos yet"
+                  description="Add your first video to this unit"
+                  onAdd={handleAddNew}
+                  addLabel="Add your first video"
+                />
               )}
             </>
           )}
 
           {activeTab === "pdfs" && (
             <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                  <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-2 rounded-lg">
-                    <BookOpen className="text-white" size={24} />
-                  </div>
-                  PDF Resources
-                </h2>
-              </div>
-
               {pdfs.length > 0 ? (
-                <div className="grid gap-4">
-                  {pdfs.map((pdf) => (
-                    <PdfItem
-                      key={pdf.pdf_id}
-                      pdf={pdf}
-                      onView={handleView}
-                      onEdit={handleEdit}
-                      onDelete={handleToggle}
-                      onForceDelete={handleForceDeleteOpen}
-                    />
-                  ))}
-                </div>
+                pdfs.map((pdf) => (
+                  <PdfItem
+                    key={pdf.pdf_id}
+                    pdf={pdf}
+                    onView={handleView}
+                    onEdit={handleEdit}
+                    onDelete={handleToggle}
+                    onForceDelete={handleForceDeleteOpen}
+                  />
+                ))
               ) : (
-                <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
-                  <BookOpen className="mx-auto mb-4 text-gray-400" size={48} />
-                  <p className="text-gray-500 text-lg">
-                    No PDFs available for this unit.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleAddNew}
-                    className="mt-4 inline-flex items-center gap-2 text-teal-600 hover:text-teal-700 font-medium"
-                  >
-                    <Plus size={16} />
-                    Add your first PDF
-                  </button>
-                </div>
+                <EmptyState
+                  icon={BookOpen}
+                  title="No PDFs yet"
+                  description="Add your first PDF to this unit"
+                  onAdd={handleAddNew}
+                  addLabel="Add your first PDF"
+                />
               )}
             </>
           )}
 
           {activeTab === "quizzes" && (
             <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                  <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-2 rounded-lg">
-                    <BookCheck className="text-white" size={24} />
-                  </div>
-                  Quizzes
-                </h2>
-              </div>
-
               {quizzes.length > 0 ? (
-                <div className="grid gap-4">
-                  {quizzes.map((quiz) => (
-                    <QuizItem
-                      key={quiz.quiz_id}
-                      quiz={quiz}
-                      onView={handleView}
-                      onEdit={handleEdit}
-                      onDelete={handleToggle}
-                      onForceDelete={handleForceDeleteOpen}
-                    />
-                  ))}
-                </div>
+                quizzes.map((quiz) => (
+                  <QuizItem
+                    key={quiz.quiz_id}
+                    quiz={quiz}
+                    onView={handleView}
+                    onEdit={handleEdit}
+                    onDelete={handleToggle}
+                    onForceDelete={handleForceDeleteOpen}
+                    onViewSolved={handleViewSolvedQuizzes}
+                  />
+                ))
               ) : (
-                <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
-                  <BookCheck className="mx-auto mb-4 text-gray-400" size={48} />
-                  <p className="text-gray-500 text-lg">
-                    No quizzes available for this unit.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleAddNew}
-                    className="mt-4 inline-flex items-center gap-2 text-teal-600 hover:text-teal-700 font-medium"
-                  >
-                    <Plus size={16} />
-                    Add your first Quiz
-                  </button>
-                </div>
+                <EmptyState
+                  icon={BookCheck}
+                  title="No quizzes yet"
+                  description="Add your first quiz to this unit"
+                  onAdd={handleAddNew}
+                  addLabel="Add your first quiz"
+                />
               )}
             </>
           )}
@@ -618,22 +737,16 @@ export default function Page() {
       <DeleteModal
         open={openDeleteModal}
         setOpen={setOpenDeleteModal}
-        title={`Do you want to delete this ${
-          deleteType === "video"
-            ? "Video"
-            : deleteType === "pdf"
-            ? "PDF"
-            : "Quiz"
-        }?`}
+        title={`Delete this ${deleteType}?`}
         description={
           deleteType === "video"
             ? rowData?.video_title
             : deleteType === "pdf"
-            ? rowData?.pdf_title
-            : rowData?.quiz_title
+              ? rowData?.pdf_title
+              : rowData?.quiz_title
         }
         handleSubmit={handleForceDeleteConfirm}
-        loading={isPending} // لو DeleteModal بيدعمها
+        loading={isPending}
       />
     </div>
   );
