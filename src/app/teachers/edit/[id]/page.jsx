@@ -26,7 +26,6 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { teacherSchema } from "../../_Schema";
 import usePostTeacher from "@/utils/Api/Teachers/PostTeachers";
 import toast from "react-hot-toast";
 import { CountrySelect, TimeZoneSelect } from "@/utils/TimeZone/TimeZone";
