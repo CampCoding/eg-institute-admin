@@ -12,7 +12,14 @@ import { BASE_URL } from "../../utils/base_url";
 export default function LiveCoursesPage() {
   const router = useRouter();
 
-  const token = localStorage.getItem("AccessToken");
+  // ✅ moved localStorage access to effect (browser-only)
+  const [token, setToken] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setToken(localStorage.getItem("AccessToken"));
+    }
+  }, []);
 
   console.log(token, "token ");
 
@@ -25,8 +32,10 @@ export default function LiveCoursesPage() {
 
   // Fetch courses from API
   useEffect(() => {
-    fetchCourses();
-  }, []);
+    if (token) fetchCourses();
+    else setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const fetchCourses = async () => {
     setLoading(true);
@@ -36,7 +45,7 @@ export default function LiveCoursesPage() {
         {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("AccessToken")}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -66,7 +75,7 @@ export default function LiveCoursesPage() {
           price: `$${course.group_price}`,
           sessions: parseInt(course.lessons) || 0,
           // maxStudents: 50, // Default value, update if API provides this
-          // students: 30, // Default value, update if API provides this
+          // students: 30, // Default value, update if API provides
           // teacher: "Instructor", // Default, update if API provides
           timezone: "EST",
           nextSession: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
