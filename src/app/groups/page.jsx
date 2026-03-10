@@ -233,10 +233,10 @@ export default function Page() {
             </button>
             <button
               onClick={() => router.push(`/groups/add-group`)}
-              className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm !text-white shadow-sm hover:shadow"
-              style={{
-                backgroundImage: "linear-gradient(90deg,#2563eb,#7c3aed)",
-              }}
+              className="bg-teal-600 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm !text-white shadow-sm hover:shadow"
+              // style={{
+              //   backgroundImage: "linear-gradient(90deg,#2563eb,#7c3aed)",
+              // }}
             >
               <Plus size={18} />
               Add New Group

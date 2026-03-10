@@ -12,6 +12,10 @@ import {
   Binoculars,
   Link as LinkIcon,
   Unlink,
+  FileCheck,
+  User,
+  ExternalLink,
+  Download,
 } from "lucide-react";
 
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
@@ -20,8 +24,10 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Toggle } from "@/utils/Api/Toggle";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Dropdown, Space, Popconfirm } from "antd";
+import { Dropdown, Space, Popconfirm, Tooltip, Modal, Empty, Spin } from "antd";
 import { ChevronDown } from "lucide-react";
+import axios from "axios";
+import { BASE_URL } from "@/utils/base_url";
 
 import useDeleteContent from "@/utils/Api/Units/DeletePdf";
 import usePostAssign from "@/utils/Api/Units/PosToggleAssignQuiz";
@@ -69,6 +75,7 @@ const CONTENT = {
       `/courses/units/${groupId}/edit-quiz/${quizId}`,
 
     needsCourseId: false,
+    hasSolvedFeature: true, // ✅ NEW: Only quizzes have solved feature
   },
 
   pdf: {
@@ -98,6 +105,7 @@ const CONTENT = {
 
     canEdit: false,
     needsCourseId: false,
+    hasSolvedFeature: false,
   },
 
   video: {
@@ -127,31 +135,209 @@ const CONTENT = {
 
     canEdit: false,
     needsCourseId: true,
+    hasSolvedFeature: false,
   },
 };
 
 // ------------------------------------------------------------
 // 2) SMALL UI PARTS
 // ------------------------------------------------------------
-const ActionButton = ({ icon: Icon, onClick, className, title }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`p-2 rounded-lg transition-all hover:scale-105 ${className}`}
-    title={title}
-  >
-    <Icon size={16} />
-  </button>
+const ActionButton = ({ icon: Icon, onClick, className, tooltip }) => (
+  <Tooltip title={tooltip} placement="top">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`p-2 rounded-lg transition-all hover:scale-105 ${className}`}
+    >
+      <Icon size={16} />
+    </button>
+  </Tooltip>
 );
+
+// ✅ NEW: Solved Quizzes Modal Component
+const SolvedQuizzesModal = ({ open, onClose, quizId, groupId, quizTitle }) => {
+  const [loading, setLoading] = useState(false);
+  const [solvedData, setSolvedData] = useState([]);
+
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("AccessToken") : null;
+
+  const fetchSolvedQuizzes = async () => {
+    if (!quizId || !groupId) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/units/content/quiz/select_sloved_group_quizes.php`,
+        {
+          quiz_id: quizId,
+          group_id: groupId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response?.data?.status === "success") {
+        setSolvedData(response?.data?.message || []);
+      } else {
+        setSolvedData([]);
+      }
+    } catch (error) {
+      console.error("Error fetching solved quizzes:", error);
+      toast.error("Failed to fetch solved quizzes");
+      setSolvedData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (open) {
+      fetchSolvedQuizzes();
+    }
+  }, [open, quizId, groupId]);
+
+  const handleViewSolution = (url) => {
+    if (!url) {
+      toast.error("No solution URL found");
+      return;
+    }
+    window.open(url, "_blank");
+  };
+
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width={700}
+      title={
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-teal-100 rounded-lg">
+            <FileCheck className="w-5 h-5 text-teal-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">Solved Quizzes</h3>
+            <p className="text-sm text-gray-500 font-normal">{quizTitle}</p>
+          </div>
+        </div>
+      }
+    >
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <Spin size="large" />
+        </div>
+      ) : solvedData.length === 0 ? (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={
+            <div className="text-center">
+              <p className="text-gray-500 mb-2">No solutions submitted yet</p>
+              <p className="text-sm text-gray-400">
+                Students who solve this quiz will appear here
+              </p>
+            </div>
+          }
+        />
+      ) : (
+        <div className="space-y-3 max-h-[400px] overflow-y-auto">
+          {solvedData.map((item, index) => (
+            <div
+              key={item.id || item.student_id || index}
+              className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-full flex items-center justify-center text-white font-semibold">
+                  {item.student_name?.charAt(0)?.toUpperCase() || (
+                    <User size={18} />
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900">
+                    {item.student_name || `Student #${item.student_id}`}
+                  </h4>
+                  {item.student_email && (
+                    <p className="text-sm text-gray-500">
+                      {item.student_email}
+                    </p>
+                  )}
+                  {item.submitted_at && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Submitted:{" "}
+                      {new Date(item.submitted_at).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {item.score !== undefined && (
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm font-medium">
+                    Score: {item.score}
+                  </span>
+                )}
+
+                {item.solved_quiz_url && (
+                  <Tooltip title="View Solution">
+                    <button
+                      onClick={() => handleViewSolution(item.solved_quiz_url)}
+                      className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                    >
+                      <ExternalLink size={16} />
+                    </button>
+                  </Tooltip>
+                )}
+                {/* 
+                {item.solved_quiz_url && (
+                  <Tooltip title="Download Solution">
+                    <a
+                      href={item.solved_quiz_url}
+                      download
+                      className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors inline-flex"
+                    >
+                      <Download size={16} />
+                    </a>
+                  </Tooltip>
+                )} */}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Summary Footer */}
+      {!loading && solvedData.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <span>Total Submissions: {solvedData.length}</span>
+            {/* You can add more stats here if the API provides them */}
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+};
 
 const ContentItem = ({
   item,
   cfg,
+  groupId,
   onEdit,
   onToggle,
   onView,
   onForceDelete,
   onUnlink,
+  onViewSolved,
   isDeleting,
   isUnlinking,
 }) => (
@@ -185,14 +371,24 @@ const ContentItem = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-2 group-hover:opacity-100 transition-opacity">
         {/* View Button */}
         <ActionButton
           icon={Binoculars}
           onClick={() => onView(item)}
           className="bg-blue-50 text-blue-600 hover:bg-blue-100"
-          title="View"
+          tooltip="View Content"
         />
+
+        {/* ✅ NEW: Solved Quizzes Button (only for quizzes) */}
+        {cfg.hasSolvedFeature && (
+          <ActionButton
+            icon={FileCheck}
+            onClick={() => onViewSolved(item)}
+            className="bg-purple-50 text-purple-600 hover:bg-purple-100"
+            tooltip="View Solved Quizzes"
+          />
+        )}
 
         {/* Edit Button (only if canEdit) */}
         {cfg.canEdit && (
@@ -200,7 +396,7 @@ const ContentItem = ({
             icon={Edit2}
             onClick={() => onEdit(item)}
             className="bg-amber-50 text-amber-600 hover:bg-amber-100"
-            title="Edit"
+            tooltip="Edit"
           />
         )}
 
@@ -209,7 +405,9 @@ const ContentItem = ({
           onClick={() => onToggle(item)}
           icon={item?.hidden === "0" ? Eye : EyeClosed}
           className="bg-teal-50 text-(--primary-color) hover:bg-teal-100"
-          title={`${item?.hidden === "0" ? "Hide" : "Show"}`}
+          tooltip={
+            item?.hidden === "0" ? "Hide from students" : "Show to students"
+          }
         />
 
         {/* Unlink Button with Popconfirm */}
@@ -226,13 +424,14 @@ const ContentItem = ({
           }}
           placement="topRight"
         >
-          <button
-            type="button"
-            className="p-2 rounded-lg transition-all hover:scale-105 bg-orange-50 text-orange-600 hover:bg-orange-100"
-            title="Unassign"
-          >
-            <Unlink size={16} />
-          </button>
+          <Tooltip title="Unassign from group" placement="top">
+            <button
+              type="button"
+              className="p-2 rounded-lg transition-all hover:scale-105 bg-orange-50 text-orange-600 hover:bg-orange-100"
+            >
+              <Unlink size={16} />
+            </button>
+          </Tooltip>
         </Popconfirm>
 
         {/* Delete Button with Popconfirm */}
@@ -259,13 +458,14 @@ const ContentItem = ({
           }}
           placement="topRight"
         >
-          <button
-            type="button"
-            className="p-2 rounded-lg transition-all hover:scale-105 bg-red-50 text-red-600 hover:bg-red-100"
-            title="Delete"
-          >
-            <Trash2 size={16} />
-          </button>
+          <Tooltip title="Delete permanently" placement="top">
+            <button
+              type="button"
+              className="p-2 rounded-lg transition-all hover:scale-105 bg-red-50 text-red-600 hover:bg-red-100"
+            >
+              <Trash2 size={16} />
+            </button>
+          </Tooltip>
         </Popconfirm>
       </div>
     </div>
@@ -420,6 +620,10 @@ export default function UnitContentPage() {
 
   const [openAssignModal, setOpenAssignModal] = useState(false);
 
+  // ✅ NEW: State for Solved Quizzes Modal
+  const [solvedModalOpen, setSolvedModalOpen] = useState(false);
+  const [selectedQuizForSolved, setSelectedQuizForSolved] = useState(null);
+
   // Track which item is being deleted/unlinked for loading states
   const [deletingItemId, setDeletingItemId] = useState(null);
   const [unlinkingItemId, setUnlinkingItemId] = useState(null);
@@ -546,6 +750,14 @@ export default function UnitContentPage() {
     }
   };
 
+  const handleViewSolved = (item) => {
+    const quizId = item?.[cfg.idKey];
+    const quizTitle = item?.[cfg.titleKey] || "Quiz";
+    router.push(
+      `/groups/GroupContent/${id}/solved-quizzes/${quizId}?title=${encodeURIComponent(quizTitle)}`
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
@@ -591,11 +803,13 @@ export default function UnitContentPage() {
                   key={String(x?.[cfg.idKey])}
                   item={x}
                   cfg={cfg}
+                  groupId={id}
                   onView={handleView}
                   onEdit={handleEdit}
                   onToggle={handleToggle}
                   onForceDelete={handleForceDelete}
                   onUnlink={handleUnlink}
+                  onViewSolved={handleViewSolved}
                   isDeleting={deletingItemId === x?.[cfg.idKey]}
                   isUnlinking={unlinkingItemId === x?.[cfg.idKey]}
                 />
@@ -628,6 +842,18 @@ export default function UnitContentPage() {
         groupId={id}
         onContinue={handleAssign}
         isLoading={isAllItemsLoading}
+      />
+
+      {/* ✅ NEW: Solved Quizzes Modal */}
+      <SolvedQuizzesModal
+        open={solvedModalOpen}
+        onClose={() => {
+          setSolvedModalOpen(false);
+          setSelectedQuizForSolved(null);
+        }}
+        quizId={selectedQuizForSolved?.[cfg.idKey]}
+        groupId={id}
+        quizTitle={selectedQuizForSolved?.[cfg.titleKey]}
       />
     </div>
   );

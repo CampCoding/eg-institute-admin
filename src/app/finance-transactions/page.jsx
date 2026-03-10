@@ -370,7 +370,7 @@ export default function FinanceTransactionsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2 group-hover:opacity-100 transition-opacity">
                           {/* <button className="p-1 text-gray-400 hover:text-blue-600 transition-colors">
                             <Eye size={16} />
                           </button> */}

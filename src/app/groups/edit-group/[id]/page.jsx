@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import BreadCrumb from "@/components/BreadCrumb/BreadCrumb";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, Lock } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -17,6 +17,7 @@ export default function Page() {
 
   const [addLoading, setAddLoading] = useState(false);
   const [loadingGroup, setLoadingGroup] = useState(true);
+  const [teachersLoading, setTeachersLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     group_name: "",
@@ -28,6 +29,9 @@ export default function Page() {
     session_duration: "",
     status: "active",
   });
+
+  // ✅ Store original teacher name for display
+  const [originalTeacherName, setOriginalTeacherName] = useState("");
 
   const [schedules, setSchedules] = useState([
     { day_of_week: "", start_time: "", end_time: "" },
@@ -46,6 +50,9 @@ export default function Page() {
     "Thursday",
     "Friday",
   ];
+
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("AccessToken") : null;
 
   const parseTimeToMinutes = (timeStr) => {
     if (!timeStr) return null;
@@ -97,8 +104,8 @@ export default function Page() {
     return false;
   };
 
+  // ✅ Fetch all courses
   function handleGetAllCourses() {
-    const token = localStorage.getItem("AccessToken");
     axios
       .get(BASE_URL + `/courses/select_live_courses.php`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -111,23 +118,60 @@ export default function Page() {
       .catch((err) => console.error(err));
   }
 
-  function handleGetAllTeachers() {
-    const token = localStorage.getItem("AccessToken");
+  // ✅ Fetch teachers for selected course - SAME AS MODAL
+  function handleGetTeachersForCourse(courseId, keepTeacherId = null) {
+    if (!courseId) {
+      setAllTeachers([]);
+      return;
+    }
+
+    setTeachersLoading(true);
+
     axios
-      .get(BASE_URL + `/teachers/select_teachers.php`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      .post(
+        `${BASE_URL}/courses/select_course_teachers.php`,
+        { course_id: courseId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      )
       .then((res) => {
         if (res?.data?.status === "success") {
-          setAllTeachers(res?.data?.message || []);
+          const teachers = res?.data?.message || [];
+          setAllTeachers(teachers);
+
+          // ✅ Find and store original teacher name
+          if (keepTeacherId) {
+            const originalTeacher = teachers.find(
+              (t) => String(t.teacher_id) === String(keepTeacherId)
+            );
+            if (originalTeacher) {
+              setOriginalTeacherName(
+                originalTeacher.teacher_name +
+                  (originalTeacher.specialization
+                    ? ` - ${originalTeacher.specialization}`
+                    : "")
+              );
+            }
+          }
+        } else {
+          setAllTeachers([]);
         }
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.error(err);
+        setAllTeachers([]);
+      })
+      .finally(() => {
+        setTeachersLoading(false);
+      });
   }
 
   // ✅ Load existing group data
   async function handleGetGroupDetails() {
-    const token = localStorage.getItem("AccessToken");
     setLoadingGroup(true);
 
     try {
@@ -147,10 +191,14 @@ export default function Page() {
 
         console.log("Found Group:", found);
 
-        // ✅ Map API response to form data
+        // ✅ Store original teacher name from group data
+        if (found.teacher_name) {
+          setOriginalTeacherName(found.teacher_name);
+        }
+
         setFormData({
           group_name: found.group_name || "",
-          group_type: found.type || "", // ⚠️ API returns "type" not "group_type"
+          group_type: found.type || "",
           course_id: String(found.course_id || ""),
           teacher_id: String(found.teacher_id || ""),
           max_students: String(found.max_students || ""),
@@ -159,14 +207,16 @@ export default function Page() {
           status: found.status || "active",
         });
 
-        // ✅ Map "slots" from API to "schedules" in form
-        // API returns "slots", but we use "schedules" in the form
+        if (found.course_id) {
+          handleGetTeachersForCourse(found.course_id, found.teacher_id);
+        }
+
         if (Array.isArray(found.slots) && found.slots.length > 0) {
           setSchedules(
             found.slots.map((slot) => ({
               day_of_week: slot.day_of_week || "",
-              start_time: slot.start_time?.slice(0, 5) || "", // Convert "16:00:00" to "16:00"
-              end_time: slot.end_time?.slice(0, 5) || "", // Convert "17:00:00" to "17:00"
+              start_time: slot.start_time?.slice(0, 5) || "",
+              end_time: slot.end_time?.slice(0, 5) || "",
             }))
           );
         } else {
@@ -185,7 +235,6 @@ export default function Page() {
 
   useEffect(() => {
     handleGetAllCourses();
-    handleGetAllTeachers();
   }, []);
 
   useEffect(() => {
@@ -224,12 +273,31 @@ export default function Page() {
     setSchedules((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ✅ SUBMIT HANDLER
+  const getSelectedTeacherSlots = () => {
+    const teacher = allTeachers.find(
+      (t) => String(t.teacher_id) === String(formData.teacher_id)
+    );
+    return teacher?.teacher_slots || [];
+  };
+
+  const getAvailableDays = () => {
+    const slots = getSelectedTeacherSlots();
+    const days = [...new Set(slots.map((s) => s.day))];
+    return days;
+  };
+
+  const formatTimeSlot = (time) => {
+    if (!time) return "";
+    const [hours, minutes] = time.split(":");
+    const h = parseInt(hours, 10);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return `${h12}:${minutes} ${ampm}`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setAddLoading(true);
-
-    const token = localStorage.getItem("AccessToken");
 
     const selectedTeacher = allTeachers.find(
       (t) => String(t.teacher_id) === String(formData.teacher_id)
@@ -261,7 +329,6 @@ export default function Page() {
       return;
     }
 
-    // ✅ Prepare payload - NO "slots", only "schedules"
     const data_send = {
       group_id: Number(id),
       group_name: formData.group_name.trim(),
@@ -308,7 +375,7 @@ export default function Page() {
     return (
       <div className="p-4 min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
           <p className="text-sm text-slate-500">Loading group data...</p>
         </div>
       </div>
@@ -348,7 +415,7 @@ export default function Page() {
               value={formData.group_name}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             />
           </div>
 
@@ -366,7 +433,7 @@ export default function Page() {
                 }))
               }
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             >
               <option value="">Choose Group Type</option>
               <option value="private">Private</option>
@@ -374,46 +441,79 @@ export default function Page() {
             </select>
           </div>
 
-          {/* Course */}
+          {/* Course - DISABLED in Edit mode */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Course <span className="text-red-500">*</span>
             </label>
-            <select
-              name="course_id"
-              value={formData.course_id}
-              onChange={handleChange}
-              required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            >
-              <option value="">Select course</option>
-              {allCourses.map((course) => (
-                <option key={course.course_id} value={course.course_id}>
-                  {course.course_name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                name="course_id"
+                value={formData.course_id}
+                disabled
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 cursor-not-allowed outline-none transition-all"
+              >
+                <option value="">Select course</option>
+                {allCourses.map((course) => (
+                  <option key={course.course_id} value={course.course_id}>
+                    {course.course_name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Lock size={16} className="text-gray-400" />
+              </div>
+            </div>
+            <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+              <Lock size={12} />
+              Course cannot be changed after group creation
+            </p>
           </div>
 
-          {/* Teacher */}
+          {/* Teacher - DISABLED in Edit mode */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Teacher <span className="text-red-500">*</span>
             </label>
-            <select
-              name="teacher_id"
-              value={formData.teacher_id}
-              onChange={handleChange}
-              required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            >
-              <option value="">Select teacher</option>
-              {allTeachers.map((t) => (
-                <option key={t.teacher_id} value={t.teacher_id}>
-                  {t.teacher_name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={
+                  teachersLoading
+                    ? "Loading..."
+                    : originalTeacherName || "No teacher assigned"
+                }
+                disabled
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 cursor-not-allowed outline-none transition-all"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Lock size={16} className="text-gray-400" />
+              </div>
+            </div>
+            <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+              <Lock size={12} />
+              Teacher cannot be changed after group creation
+            </p>
+
+            {/* Show selected teacher's available slots */}
+            {formData.teacher_id && getSelectedTeacherSlots().length > 0 && (
+              <div className="mt-2 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                <p className="text-xs font-medium text-teal-800 mb-2">
+                  📅 Teacher's Available Slots:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {getSelectedTeacherSlots().map((slot, idx) => (
+                    <span
+                      key={idx}
+                      className="text-xs bg-white text-teal-700 px-2 py-1 rounded-full border border-teal-200"
+                    >
+                      {slot.day}: {formatTimeSlot(slot.slots_from)} -{" "}
+                      {formatTimeSlot(slot.slots_to)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Max Students */}
@@ -430,7 +530,7 @@ export default function Page() {
               onChange={handleChange}
               min={1}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             />
           </div>
 
@@ -445,7 +545,7 @@ export default function Page() {
               value={formData.start_date}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             />
           </div>
 
@@ -462,7 +562,7 @@ export default function Page() {
               onChange={handleChange}
               min={1}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             />
           </div>
 
@@ -476,7 +576,7 @@ export default function Page() {
               value={formData.status}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             >
               {statuses.map((status) => (
                 <option key={status} value={status}>
@@ -487,98 +587,148 @@ export default function Page() {
           </div>
 
           {/* Schedules */}
-          {/* <div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Schedules <span className="text-red-500">*</span>
             </label>
 
+            {/* Hint for available days */}
+            {formData.teacher_id && getAvailableDays().length > 0 && (
+              <div className="mb-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+                <p className="text-xs text-yellow-800">
+                  💡 <strong>Tip:</strong> This teacher is available on:{" "}
+                  <span className="font-medium">
+                    {getAvailableDays().join(", ")}
+                  </span>
+                </p>
+              </div>
+            )}
+
             <div className="space-y-3">
-              {schedules.map((schedule, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end border border-slate-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  <div>
-                    <span className="block text-xs font-medium text-gray-600 mb-1">
-                      Day of Week
-                    </span>
-                    <select
-                      value={schedule.day_of_week}
-                      onChange={(e) =>
-                        handleScheduleChange(
-                          index,
-                          "day_of_week",
-                          e.target.value
-                        )
-                      }
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    >
-                      <option value="">Select day</option>
-                      {daysOfWeek.map((day) => (
-                        <option key={day} value={day}>
-                          {day}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              {schedules.map((schedule, index) => {
+                const availableDays = getAvailableDays();
+                const isValidDay =
+                  !schedule.day_of_week ||
+                  availableDays.length === 0 ||
+                  availableDays.includes(schedule.day_of_week);
 
-                  <div>
-                    <span className="block text-xs font-medium text-gray-600 mb-1">
-                      Start Time
-                    </span>
-                    <input
-                      type="time"
-                      value={schedule.start_time}
-                      onChange={(e) =>
-                        handleScheduleChange(
-                          index,
-                          "start_time",
-                          e.target.value
-                        )
-                      }
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <span className="block text-xs font-medium text-gray-600 mb-1">
-                      End Time
-                    </span>
-                    <input
-                      type="time"
-                      value={schedule.end_time}
-                      onChange={(e) =>
-                        handleScheduleChange(index, "end_time", e.target.value)
-                      }
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div className="flex md:justify-end">
-                    {schedules.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeScheduleRow(index)}
-                        className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                return (
+                  <div
+                    key={index}
+                    className={`grid grid-cols-1 md:grid-cols-4 gap-3 items-end border rounded-lg p-4 ${
+                      !isValidDay
+                        ? "border-red-300 bg-red-50"
+                        : "border-slate-200 bg-gray-50"
+                    } hover:bg-gray-100 transition-colors`}
+                  >
+                    {/* Day of Week */}
+                    <div>
+                      <span className="block text-xs font-medium text-gray-600 mb-1">
+                        Day of Week
+                      </span>
+                      <select
+                        value={schedule.day_of_week}
+                        onChange={(e) =>
+                          handleScheduleChange(
+                            index,
+                            "day_of_week",
+                            e.target.value
+                          )
+                        }
+                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none ${
+                          !isValidDay
+                            ? "border-red-400 bg-red-50"
+                            : "border-gray-300"
+                        }`}
                       >
-                        <Trash2 size={14} />
-                        Remove
-                      </button>
-                    )}
+                        <option value="">Select day</option>
+                        {daysOfWeek.map((day) => {
+                          const isAvailable =
+                            availableDays.length === 0 ||
+                            availableDays.includes(day);
+                          return (
+                            <option
+                              key={day}
+                              value={day}
+                              className={!isAvailable ? "text-gray-400" : ""}
+                            >
+                              {day} {!isAvailable && "(unavailable)"}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      {!isValidDay && (
+                        <p className="text-xs text-red-600 mt-1">
+                          Teacher not available on this day
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Start Time */}
+                    <div>
+                      <span className="block text-xs font-medium text-gray-600 mb-1">
+                        Start Time
+                      </span>
+                      <input
+                        type="time"
+                        value={schedule.start_time}
+                        onChange={(e) =>
+                          handleScheduleChange(
+                            index,
+                            "start_time",
+                            e.target.value
+                          )
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                      />
+                    </div>
+
+                    {/* End Time */}
+                    <div>
+                      <span className="block text-xs font-medium text-gray-600 mb-1">
+                        End Time
+                      </span>
+                      <input
+                        type="time"
+                        value={schedule.end_time}
+                        onChange={(e) =>
+                          handleScheduleChange(
+                            index,
+                            "end_time",
+                            e.target.value
+                          )
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                      />
+                    </div>
+
+                    {/* Remove Button */}
+                    <div className="flex md:justify-end">
+                      {schedules.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeScheduleRow(index)}
+                          className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                          Remove
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <button
               type="button"
               onClick={addScheduleRow}
-              className="mt-3 inline-flex items-center gap-1 px-4 py-2 text-sm rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium"
+              className="!mt-3 inline-flex items-center gap-1 px-4 py-2 text-sm rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors font-medium"
             >
               <Plus size={16} />
               Add another schedule
             </button>
-          </div> */}
+          </div>
 
           {/* Buttons */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
@@ -592,29 +742,11 @@ export default function Page() {
             <button
               type="submit"
               disabled={addLoading}
-              className="px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed font-medium"
+              className="px-6 py-2.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed font-medium"
             >
               {addLoading ? (
                 <span className="flex items-center gap-2">
-                  <svg
-                    className="animate-spin h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
+                  <Loader2 size={16} className="animate-spin" />
                   Saving...
                 </span>
               ) : (

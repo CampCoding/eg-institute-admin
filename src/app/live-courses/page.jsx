@@ -8,12 +8,17 @@ import DeleteModal from "@/components/DeleteModal/DeleteModal";
 import { message, Spin } from "antd";
 import axios from "axios";
 import { BASE_URL } from "../../utils/base_url";
+import AssignTeachersModal from "../../components/AssignTeachersModal/AssignTeachersModal";
 
 export default function LiveCoursesPage() {
   const router = useRouter();
 
   // ✅ moved localStorage access to effect (browser-only)
   const [token, setToken] = useState(null);
+
+  const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
+  const [selectedCourseForTeachers, setSelectedCourseForTeachers] =
+    useState(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -354,6 +359,23 @@ export default function LiveCoursesPage() {
               {/* Actions */}
               <div className="mt-4 flex items-center gap-2">
                 <button
+                  onClick={() => {
+                    setSelectedCourseForTeachers(c);
+                    setIsTeacherModalOpen(true);
+                  }}
+                  className="flex-1 rounded-xl bg-[var(--primary-color)] text-white py-2 text-sm font-medium hover:opacity-90 transition-all duration-200"
+                  aria-label="Assign Teachers"
+                  title="Assign Teachers"
+                >
+                  Teachers
+                </button>
+                <button
+                  onClick={() => router.push(`/courses/units/${c.id}`)}
+                  className="flex-1 rounded-xl bg-[var(--primary-color)] text-white py-2 text-sm font-medium hover:opacity-90 transition-all duration-200"
+                >
+                  Units
+                </button>
+                <button
                   onClick={() => router.push(`/live-courses/meetings/${c.id}`)}
                   className="flex-1 rounded-xl bg-[var(--primary-color)] text-white py-2 text-sm font-medium hover:opacity-90 transition-all duration-200"
                 >
@@ -424,6 +446,17 @@ export default function LiveCoursesPage() {
         setOpen={setOpenDeleteModal}
         loading={deleteLoading}
       />
+
+      {isTeacherModalOpen && (
+        <AssignTeachersModal
+          open={isTeacherModalOpen}
+          onClose={() => {
+            setIsTeacherModalOpen(false);
+            setSelectedCourseForTeachers(null);
+          }}
+          course={selectedCourseForTeachers}
+        />
+      )}
     </div>
   );
 }

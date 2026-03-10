@@ -26,6 +26,7 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
 import usePostTeacher from "@/utils/Api/Teachers/PostTeachers";
 import toast from "react-hot-toast";
 import { CountrySelect, TimeZoneSelect } from "@/utils/TimeZone/TimeZone";
@@ -55,6 +56,67 @@ const TAG_SUGGESTIONS = [
 ];
 
 const Languages = ["Arabic (Native)", "English (C1)", "French (B1)"];
+
+// ✅ Add the missing teacherSchema
+const teacherSchema = yup.object().shape({
+  name: yup
+    .string()
+    .trim()
+    .required("Full name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: yup
+    .string()
+    .trim()
+    .required("Email is required")
+    .email("Please enter a valid email address"),
+  title: yup
+    .string()
+    .trim()
+    .required("Specialization is required")
+    .min(2, "Specialization must be at least 2 characters"),
+  phone: yup.string().trim().nullable(),
+  summary: yup
+    .string()
+    .trim()
+    .required("Bio/Summary is required")
+    .min(10, "Summary must be at least 10 characters"),
+  photo: yup.string().trim().url("Please enter a valid URL").nullable(),
+  video: yup.string().trim().url("Please enter a valid URL").nullable(),
+  level: yup
+    .string()
+    .oneOf(
+      ["Beginner", "Intermediate", "Expert"],
+      "Please select a valid level"
+    )
+    .required("Level is required"),
+  tags: yup.array().of(yup.string()).nullable(),
+  Languages: yup.array().of(yup.string()).nullable(),
+  country: yup.string().trim().nullable(),
+  TimeZone: yup.string().trim().nullable(),
+  hourly_rate: yup
+    .string()
+    .nullable()
+    .test("is-number", "Must be a valid number", (value) => {
+      if (!value || value === "") return true;
+      return !isNaN(Number(value));
+    }),
+  experience: yup
+    .string()
+    .nullable()
+    .test("is-number", "Must be a valid number", (value) => {
+      if (!value || value === "") return true;
+      return !isNaN(Number(value));
+    }),
+  teacher_slots: yup.array().of(
+    yup.object().shape({
+      day: yup.string().required("Day is required"),
+      slots_from: yup.string().required("Start time is required"),
+      slots_to: yup.string().required("End time is required"),
+      hidden: yup.number().nullable(),
+      slots_id: yup.number().nullable(),
+    })
+  ),
+});
 
 // Enhanced RHFFormItem component
 function RHFFormItem({

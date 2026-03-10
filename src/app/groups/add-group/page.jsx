@@ -10,7 +10,6 @@ import toast from "react-hot-toast";
 export default function Page() {
   const router = useRouter();
 
-  // ✅ Main form data
   const [formData, setFormData] = useState({
     group_name: "",
     group_type: "",
@@ -22,7 +21,6 @@ export default function Page() {
     status: "active",
   });
 
-  // ✅ Schedules array
   const [schedules, setSchedules] = useState([
     { day_of_week: "", start_time: "", end_time: "" },
   ]);
@@ -46,7 +44,6 @@ export default function Page() {
   const token =
     typeof window !== "undefined" ? localStorage.getItem("AccessToken") : null;
 
-  // 🔹 Helper to convert time to minutes for comparison
   const parseTimeToMinutes = (timeStr) => {
     if (!timeStr) return null;
     const parts = timeStr.split(":");
@@ -55,7 +52,6 @@ export default function Page() {
     return h * 60 + m;
   };
 
-  // 🔹 Validate schedule is within teacher's available slots
   const isScheduleWithinTeacherSlots = (schedule, teacher) => {
     if (!teacher || !Array.isArray(teacher.teacher_slots)) {
       return true;
@@ -119,7 +115,7 @@ export default function Page() {
       .catch((err) => console.error(err));
   }
 
-  // ✅ Fetch teachers for selected course
+  // ✅ Fetch teachers for selected course - SAME AS MODAL
   function handleGetTeachersForCourse(courseId) {
     if (!courseId) {
       setAllTeachers([]);
@@ -127,13 +123,11 @@ export default function Page() {
     }
 
     setTeachersLoading(true);
-    // Reset teacher selection when course changes
-    setFormData((prev) => ({ ...prev, teacher_id: "" }));
 
     axios
       .post(
-        BASE_URL + `/teachers/select_teachers_forcourse.php`,
-        { course_id: String(courseId) },
+        `${BASE_URL}/courses/select_course_teachers.php`,
+        { course_id: courseId },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -146,37 +140,36 @@ export default function Page() {
           setAllTeachers(res?.data?.message || []);
         } else {
           setAllTeachers([]);
-          toast.error(
-            res?.data?.message || "No teachers found for this course"
-          );
         }
       })
       .catch((err) => {
         console.error(err);
         setAllTeachers([]);
-        toast.error("Failed to fetch teachers for this course");
       })
       .finally(() => {
         setTeachersLoading(false);
       });
   }
 
-  // ✅ Initial load - fetch courses only
   useEffect(() => {
     handleGetAllCourses();
   }, []);
 
-  // ✅ When course changes, fetch teachers for that course
-  useEffect(() => {
-    if (formData.course_id) {
-      handleGetTeachersForCourse(formData.course_id);
+  const handleCourseChange = (e) => {
+    const newCourseId = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      course_id: newCourseId,
+      teacher_id: "",
+    }));
+
+    if (newCourseId) {
+      handleGetTeachersForCourse(newCourseId);
     } else {
       setAllTeachers([]);
-      setFormData((prev) => ({ ...prev, teacher_id: "" }));
     }
-  }, [formData.course_id]);
+  };
 
-  // Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -185,7 +178,6 @@ export default function Page() {
     }));
   };
 
-  // Handle schedule field changes
   const handleScheduleChange = (index, field, value) => {
     setSchedules((prev) => {
       const copy = [...prev];
@@ -208,7 +200,6 @@ export default function Page() {
     setSchedules((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Get selected teacher's available days for schedule validation hint
   const getSelectedTeacherSlots = () => {
     const teacher = allTeachers.find(
       (t) => String(t.teacher_id) === String(formData.teacher_id)
@@ -216,11 +207,19 @@ export default function Page() {
     return teacher?.teacher_slots || [];
   };
 
-  // Get available days from selected teacher
   const getAvailableDays = () => {
     const slots = getSelectedTeacherSlots();
     const days = [...new Set(slots.map((s) => s.day))];
     return days;
+  };
+
+  const formatTimeSlot = (time) => {
+    if (!time) return "";
+    const [hours, minutes] = time.split(":");
+    const h = parseInt(hours, 10);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return `${h12}:${minutes} ${ampm}`;
   };
 
   const handleSubmit = async (e) => {
@@ -299,6 +298,7 @@ export default function Page() {
         });
         setSchedules([{ day_of_week: "", end_time: "", start_time: "" }]);
         setAllTeachers([]);
+        router.push("/groups");
       } else {
         toast.error(res?.data?.message || "Something went wrong");
       }
@@ -310,23 +310,13 @@ export default function Page() {
     setAddLoading(false);
   };
 
-  // Format time for display (HH:MM:SS -> HH:MM AM/PM)
-  const formatTimeSlot = (time) => {
-    if (!time) return "";
-    const [hours, minutes] = time.split(":");
-    const h = parseInt(hours, 10);
-    const ampm = h >= 12 ? "PM" : "AM";
-    const h12 = h % 12 || 12;
-    return `${h12}:${minutes} ${ampm}`;
-  };
-
   return (
     <div className="!overflow-x-hidden">
       <div className="flex mb-4 items-center gap-2">
         <button
           type="button"
           onClick={() => router.back()}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+          className="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
         >
           <ArrowLeft size={16} className="inline -mt-0.5 mr-1" />
           Back
@@ -339,12 +329,12 @@ export default function Page() {
         child={"Add Group"}
       />
 
-      <div className="mt-5 bg-white rounded-2xl border border-slate-200 p-4">
+      <div className="mt-5 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Group Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Group Name
+              Group Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -353,14 +343,14 @@ export default function Page() {
               value={formData.group_name}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             />
           </div>
 
           {/* Group Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Group Type
+              Group Type <span className="text-red-500">*</span>
             </label>
             <select
               value={formData?.group_type}
@@ -368,7 +358,7 @@ export default function Page() {
                 setFormData({ ...formData, group_type: e.target?.value })
               }
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             >
               <option value="" disabled>
                 Choose Group Type
@@ -386,9 +376,9 @@ export default function Page() {
             <select
               name="course_id"
               value={formData.course_id}
-              onChange={handleChange}
+              onChange={handleCourseChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             >
               <option value="">Select course first</option>
               {allCourses.map((course) => (
@@ -398,7 +388,7 @@ export default function Page() {
               ))}
             </select>
             <p className="text-xs text-slate-500 mt-1">
-              Select a course to load available teachers
+              Select a course to load assigned teachers
             </p>
           </div>
 
@@ -414,7 +404,7 @@ export default function Page() {
                 onChange={handleChange}
                 required
                 disabled={!formData.course_id || teachersLoading}
-                className={`w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none ${
+                className={`w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all ${
                   !formData.course_id || teachersLoading
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
@@ -426,15 +416,13 @@ export default function Page() {
                     : teachersLoading
                       ? "Loading teachers..."
                       : allTeachers.length === 0
-                        ? "No teachers available for this course"
+                        ? "No teachers assigned to this course"
                         : "Select teacher"}
                 </option>
                 {allTeachers.map((t) => (
                   <option key={t.teacher_id} value={t.teacher_id}>
                     {t.teacher_name}
-                    {t.languages && t.languages.filter(Boolean).length > 0
-                      ? ` (${t.languages.filter(Boolean).join(", ")})`
-                      : ""}
+                    {t.specialization ? ` - ${t.specialization}` : ""}
                   </option>
                 ))}
               </select>
@@ -445,17 +433,30 @@ export default function Page() {
               )}
             </div>
 
+            {/* No teachers hint */}
+            {formData.course_id &&
+              !teachersLoading &&
+              allTeachers.length === 0 && (
+                <div className="mt-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <p className="text-xs text-yellow-800">
+                    ⚠️ No teachers assigned to this course. Please assign
+                    teachers first from the{" "}
+                    <span className="font-medium">Live Courses</span> page.
+                  </p>
+                </div>
+              )}
+
             {/* Show selected teacher's available slots */}
             {formData.teacher_id && getSelectedTeacherSlots().length > 0 && (
-              <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-xs font-medium text-blue-800 mb-2">
+              <div className="mt-2 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                <p className="text-xs font-medium text-teal-800 mb-2">
                   📅 Teacher's Available Slots:
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {getSelectedTeacherSlots().map((slot, idx) => (
                     <span
                       key={idx}
-                      className="text-xs bg-white text-blue-700 px-2 py-1 rounded-full border border-blue-200"
+                      className="text-xs bg-white text-teal-700 px-2 py-1 rounded-full border border-teal-200"
                     >
                       {slot.day}: {formatTimeSlot(slot.slots_from)} -{" "}
                       {formatTimeSlot(slot.slots_to)}
@@ -469,7 +470,7 @@ export default function Page() {
           {/* Max Students */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Max Students
+              Max Students <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -480,14 +481,14 @@ export default function Page() {
               onChange={handleChange}
               min={1}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             />
           </div>
 
           {/* Start Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date
+              Start Date <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -495,37 +496,38 @@ export default function Page() {
               value={formData.start_date}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             />
           </div>
 
           {/* Session Duration */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Session Duration
+              Session Duration (minutes) <span className="text-red-500">*</span>
             </label>
             <input
-              type="text"
+              type="number"
               name="session_duration"
-              placeholder="e.g. 90 minutes"
+              placeholder="e.g. 90"
               value={formData.session_duration}
               onChange={handleChange}
+              min={1}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             />
           </div>
 
           {/* Status */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Status
+              Status <span className="text-red-500">*</span>
             </label>
             <select
               name="status"
               value={formData.status}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[--primary-color] outline-none"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
             >
               {statuses.map((status) => (
                 <option key={status} value={status}>
@@ -538,7 +540,7 @@ export default function Page() {
           {/* Schedules */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              Schedules
+              Schedules <span className="text-red-500">*</span>
             </label>
 
             {/* Hint for available days */}
@@ -564,11 +566,11 @@ export default function Page() {
                 return (
                   <div
                     key={index}
-                    className={`grid grid-cols-1 md:grid-cols-4 gap-3 items-end border rounded-lg p-3 ${
+                    className={`grid grid-cols-1 md:grid-cols-4 gap-3 items-end border rounded-lg p-4 ${
                       !isValidDay
                         ? "border-red-300 bg-red-50"
-                        : "border-slate-200"
-                    }`}
+                        : "border-slate-200 bg-gray-50"
+                    } hover:bg-gray-100 transition-colors`}
                   >
                     {/* Day of Week */}
                     <div>
@@ -584,7 +586,7 @@ export default function Page() {
                             e.target.value
                           )
                         }
-                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[--primary-color] outline-none ${
+                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none ${
                           !isValidDay
                             ? "border-red-400 bg-red-50"
                             : "border-gray-300"
@@ -628,7 +630,7 @@ export default function Page() {
                             e.target.value
                           )
                         }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[--primary-color] outline-none"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
                       />
                     </div>
 
@@ -647,7 +649,7 @@ export default function Page() {
                             e.target.value
                           )
                         }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[--primary-color] outline-none"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
                       />
                     </div>
 
@@ -657,7 +659,7 @@ export default function Page() {
                         <button
                           type="button"
                           onClick={() => removeScheduleRow(index)}
-                          className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100"
+                          className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                         >
                           <Trash2 size={14} />
                           Remove
@@ -672,29 +674,29 @@ export default function Page() {
             <button
               type="button"
               onClick={addScheduleRow}
-              className="mt-3 inline-flex items-center gap-1 px-3 py-2 text-xs rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"
+              className="!mt-3 inline-flex items-center gap-1 px-4 py-2 text-sm rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors font-medium"
             >
-              <Plus size={14} />
+              <Plus size={16} />
               Add another schedule
             </button>
           </div>
 
           {/* Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-6 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all"
+              className="px-6 py-2.5 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={addLoading || !formData.teacher_id}
-              className="px-6 py-2 rounded-lg bg-blue-600 !text-white hover:bg-blue-700 shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed font-medium"
             >
               {addLoading ? (
-                <span className="inline-flex items-center gap-2">
+                <span className="flex items-center gap-2">
                   <Loader2 size={16} className="animate-spin" />
                   Saving...
                 </span>
