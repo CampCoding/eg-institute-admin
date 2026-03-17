@@ -71,6 +71,7 @@ export default function TeachersPage() {
 
     // Additional API fields
     teacher_email: teacher?.teacher_email,
+    teacher_certificates: teacher?.teacher_certificates,
     phone: teacher?.phone,
     hourly_rate: teacher?.hourly_rate,
     experience_hours: teacher?.experience_hours,

@@ -22,6 +22,8 @@ import {
   Video,
   Play,
   X,
+  FileText,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
@@ -75,11 +77,8 @@ const teacherSchema = yup.object().shape({
     .required("Specialization is required")
     .min(2, "Specialization must be at least 2 characters"),
   phone: yup.string().trim().nullable(),
-  summary: yup
-    .string()
-    .trim()
-    .required("Bio/Summary is required")
-    .min(10, "Summary must be at least 10 characters"),
+  summary: yup.string().trim().required("Bio/Summary is required"),
+  // .min(10, "Summary must be at least 10 characters"),
   photo: yup.string().trim().url("Please enter a valid URL").nullable(),
   video: yup.string().trim().url("Please enter a valid URL").nullable(),
   level: yup
@@ -247,6 +246,8 @@ export default function EditTeacherPage() {
   const [videoUploadLoading, setVideoUploadLoading] = useState(false);
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [videoFile, setVideoFile] = useState(null);
+  const [certificatesLoading, setCertificatesLoading] = useState(false);
+  const [uploadedCertificates, setUploadedCertificates] = useState([]);
 
   // Get token from localStorage
   const token =
@@ -280,6 +281,7 @@ export default function EditTeacherPage() {
       hourly_rate: "",
       experience: "",
       teacher_slots: [],
+      teacher_certificates: [],
     },
   });
 
@@ -291,8 +293,6 @@ export default function EditTeacherPage() {
   const preview = toPreview(watch());
   const toMoment = (t) => (t ? moment(t, "HH:mm:ss") : null);
   const toTimeString = (m) => (m ? m.format("HH:mm:ss") : "");
-
-  // ✅ Updated to properly map Redux data to form fields
   useEffect(() => {
     if (!teacher) {
       toast.error("No teacher data found. Redirecting...");
@@ -301,58 +301,94 @@ export default function EditTeacherPage() {
     }
 
     console.log("Loading teacher data from Redux:", teacher);
+    console.log("Certificates from API:", teacher?.teacher_certificates);
+
+    // Parse existing certificates (string separated by **)
+    let certificatesArray = [];
+
+    if (teacher?.teacher_certificates) {
+      if (typeof teacher.teacher_certificates === "string") {
+        certificatesArray = teacher.teacher_certificates
+          .split("**")
+          .filter(Boolean);
+      } else if (Array.isArray(teacher.teacher_certificates)) {
+        certificatesArray = teacher.teacher_certificates.filter(Boolean);
+      }
+    }
+
+    console.log("Parsed certificates array:", certificatesArray);
+
+    // Set uploaded certificates state for display - IMPORTANT!
+    if (certificatesArray.length > 0) {
+      const certificatesForDisplay = certificatesArray.map((url, index) => {
+        const isPdf = url.toLowerCase().includes(".pdf");
+        return {
+          url: url,
+          name: isPdf
+            ? `Certificate_${index + 1}.pdf`
+            : `Certificate_${index + 1}.jpg`,
+          type: isPdf ? "application/pdf" : "image/jpeg",
+        };
+      });
+
+      console.log("Certificates for display:", certificatesForDisplay);
+      setUploadedCertificates(certificatesForDisplay);
+    } else {
+      setUploadedCertificates([]);
+    }
+
+    // Parse tags
+    let tagsArray = [];
+    if (teacher?.tags) {
+      if (typeof teacher.tags === "string") {
+        tagsArray = teacher.tags
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      } else if (Array.isArray(teacher.tags)) {
+        tagsArray = teacher.tags;
+      }
+    }
+
+    // Parse languages
+    const languagesArray = Array.isArray(teacher?.languages)
+      ? teacher.languages
+      : [];
+
+    // Parse teacher slots
+    const slotsArray = Array.isArray(teacher?.teacher_slots)
+      ? teacher.teacher_slots.map((s) => ({
+          day: s?.day || "Monday",
+          slots_from: s?.slots_from || "",
+          slots_to: s?.slots_to || "",
+          hidden: s?.hidden || 0,
+          slots_id: s?.slots_id ? Number(s.slots_id) : null,
+        }))
+      : [];
+
+    // Capitalize first letter for level
+    const levelValue = teacher?.level
+      ? teacher.level.charAt(0).toUpperCase() +
+        teacher.level.slice(1).toLowerCase()
+      : "Expert";
 
     reset({
-      // Basic fields (already mapped correctly in Redux)
-      name: teacher?.name || "",
-      email: teacher?.email || teacher?.teacher_email || "",
+      name: teacher?.teacher_name || teacher?.name || "",
+      email: teacher?.teacher_email || teacher?.email || "",
       phone: teacher?.phone || "",
-      title: teacher?.title || teacher?.specialization || "",
-      summary: teacher?.summary || "",
-      photo: teacher?.photo || teacher?.teacher_image || DEFAULT_PHOTO,
-
-      // Video field (might be in API response but not always in mapped data)
+      title: teacher?.specialization || teacher?.title || "",
+      summary: teacher?.bio || teacher?.summary || "",
+      photo: teacher?.teacher_image || teacher?.photo || DEFAULT_PHOTO,
       video: teacher?.video || "",
-
-      // Location fields
       country: teacher?.country || "",
       TimeZone: teacher?.time_zone || teacher?.TimeZone || "Africa/Cairo",
-
-      // Professional fields
       hourly_rate: teacher?.hourly_rate || "",
       experience: teacher?.experience_hours || teacher?.experience || "",
-
-      // Level - capitalize first letter (API sends "beginner", form needs "Beginner")
-      level: capitalizeFirstLetter(teacher?.level) || "Expert",
-
-      // Tags - handle both string and array formats
-      tags:
-        typeof teacher?.tags === "string"
-          ? teacher.tags
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : Array.isArray(teacher?.tags)
-            ? teacher.tags
-            : [],
-
-      // Languages - handle case sensitivity (languages vs Languages)
-      Languages: Array.isArray(teacher?.languages)
-        ? teacher.languages
-        : Array.isArray(teacher?.Languages)
-          ? teacher.Languages
-          : [],
-
-      // Teacher slots - map with all fields including slots_id and hidden
-      teacher_slots: Array.isArray(teacher?.teacher_slots)
-        ? teacher.teacher_slots.map((s) => ({
-            day: s?.day || "Monday",
-            slots_from: s?.slots_from || "",
-            slots_to: s?.slots_to || "",
-            hidden: s?.hidden || 0,
-            slots_id: s?.slots_id || null,
-          }))
-        : [],
+      level: levelValue,
+      tags: tagsArray,
+      Languages: languagesArray,
+      teacher_slots: slotsArray,
+      teacher_certificates: certificatesArray.join("**"),
     });
   }, [teacher, reset, router]);
 
@@ -463,6 +499,216 @@ export default function EditTeacherPage() {
     }
   };
 
+  // ============ UPLOAD FUNCTIONS ============
+
+  async function uploadPdf(file) {
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("AccessToken") || localStorage.getItem("token")
+        : null;
+
+    if (!token) {
+      return { status: "error", message: "No authentication token found" };
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await axios.post(
+        `https://camp-coding.tech/eg_Institute/pdf_uplouder.php`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+          timeout: 60000,
+        }
+      );
+
+      if (response.data) {
+        return { status: "success", file_url: response.data?.file_url };
+      } else {
+        return { status: "error", message: "Failed to upload PDF" };
+      }
+    } catch (error) {
+      console.error("PDF upload error:", error);
+      return { status: "error", message: error.message };
+    }
+  }
+
+  async function uploadImage(file) {
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("AccessToken") || localStorage.getItem("token")
+        : null;
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const response = await axios.post(
+        `https://camp-coding.tech/eg_Institute/image_uplouder.php`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+          timeout: 30000,
+        }
+      );
+
+      if (response.data) {
+        return response.data;
+      } else {
+        throw new Error("Failed to upload image");
+      }
+    } catch (error) {
+      console.error("Image upload error:", error);
+      throw error;
+    }
+  }
+
+  // Handle Multiple Certificates Upload
+  const handleMultipleCertificatesUpload = async (files) => {
+    if (certificatesLoading || !token) {
+      if (!token) {
+        toast.error("Authentication token not found. Please login again.");
+      }
+      return;
+    }
+
+    const validFiles = [];
+    for (const file of files) {
+      const isPDF = file.type === "application/pdf";
+      const isImage = file.type.startsWith("image/");
+
+      if (!isPDF && !isImage) {
+        toast.error(`${file.name}: Only PDF or image files allowed!`);
+        continue;
+      }
+
+      const isLt10M = file.size / 1024 / 1024 < 10;
+      if (!isLt10M) {
+        toast.error(`${file.name}: File must be smaller than 10MB!`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) return;
+
+    setCertificatesLoading(true);
+
+    try {
+      const results = [];
+
+      for (const file of validFiles) {
+        const isPDF = file.type === "application/pdf";
+
+        try {
+          let fileUrl;
+
+          if (isPDF) {
+            const res = await uploadPdf(file);
+            if (res.status === "success") {
+              fileUrl = res.file_url;
+            } else {
+              throw new Error(res.message || "Failed to upload PDF");
+            }
+          } else {
+            fileUrl = await uploadImage(file);
+          }
+
+          results.push({
+            success: true,
+            url: fileUrl,
+            name: file.name,
+            type: file.type,
+          });
+        } catch (error) {
+          results.push({
+            success: false,
+            name: file.name,
+            error: error.message,
+          });
+        }
+      }
+
+      const successfulUploads = results.filter((r) => r.success);
+      const failedUploads = results.filter((r) => !r.success);
+
+      if (successfulUploads.length > 0) {
+        const currentCertificates = watch("teacher_certificates") || "";
+        const certificatesArray = currentCertificates
+          ? currentCertificates.split("**").filter(Boolean)
+          : [];
+
+        successfulUploads.forEach((upload) => {
+          if (!certificatesArray.includes(upload.url)) {
+            certificatesArray.push(upload.url);
+          }
+        });
+
+        setValue("teacher_certificates", certificatesArray.join("**"));
+
+        setUploadedCertificates((prev) => {
+          const existingUrls = new Set(prev.map((f) => f.url));
+          const newFiles = successfulUploads.filter(
+            (upload) => !existingUrls.has(upload.url)
+          );
+          return [
+            ...prev,
+            ...newFiles.map((upload) => ({
+              url: upload.url,
+              name: upload.name,
+              type: upload.type,
+            })),
+          ];
+        });
+
+        toast.success(
+          `${successfulUploads.length} file(s) uploaded successfully!`
+        );
+      }
+
+      if (failedUploads.length > 0) {
+        failedUploads.forEach((f) => {
+          toast.error(`Failed to upload: ${f.name}`);
+        });
+      }
+    } catch (error) {
+      console.error("Error uploading certificates:", error);
+      toast.error("Failed to upload certificates. Please try again.");
+    } finally {
+      setCertificatesLoading(false);
+    }
+  };
+
+  // Remove certificate
+  const removeCertificate = (index) => {
+    const currentCertificates = watch("teacher_certificates")
+      .split("**")
+      .filter(Boolean);
+    currentCertificates.splice(index, 1);
+    setValue("teacher_certificates", currentCertificates.join("**"));
+
+    setUploadedCertificates((prev) => {
+      const newCertificates = [...prev];
+      newCertificates.splice(index, 1);
+      return newCertificates;
+    });
+
+    toast.success("Certificate removed");
+  };
+
   const clearVideo = () => {
     setValue("video", "");
     setVideoFile(null);
@@ -492,7 +738,12 @@ export default function EditTeacherPage() {
         }
       }
 
-      // ✅ Updated payload to match API requirements
+      // تحويل الشهادات من string إلى array
+      const certificatesString = values.teacher_certificates || "";
+      const certificatesArray = certificatesString
+        ? certificatesString.split("**").filter(Boolean)
+        : [];
+
       const payload = {
         teacher_id: Number(id),
         teacher_name: values.name,
@@ -502,6 +753,8 @@ export default function EditTeacherPage() {
         experience_hours: String(values.experience || "0"),
         teacher_image: values.photo || DEFAULT_PHOTO,
         video: values.video || "",
+        // إرسال الشهادات كـ Array
+        teacher_certificates: certificatesArray,
         specialization: values.title,
         bio: values.summary || "",
         tags: Array.isArray(values.tags)
@@ -510,6 +763,7 @@ export default function EditTeacherPage() {
         level: values.level ? values.level.toLowerCase() : "expert",
         time_zone: values.TimeZone || "UTC",
         country: values.country || "",
+        // إرسال اللغات كـ Array
         languages: Array.isArray(values.Languages) ? values.Languages : [],
         teacher_slots: (values.teacher_slots || []).map((s) => ({
           day: s.day,
@@ -657,7 +911,7 @@ export default function EditTeacherPage() {
                 Professional Details
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <RHFFormItem
                   name="Languages"
                   control={control}
@@ -704,6 +958,7 @@ export default function EditTeacherPage() {
                       <Option value="Beginner">Beginner</Option>
                       <Option value="Intermediate">Intermediate</Option>
                       <Option value="Expert">Expert</Option>
+                      <Option value="All_Levels">All Levels</Option>
                     </Select>
                   )}
                 </RHFFormItem>
@@ -721,21 +976,6 @@ export default function EditTeacherPage() {
                     size="large"
                     className="rounded-lg"
                     onWheel={(e) => e.target.blur()}
-                  />
-                </RHFFormItem>
-
-                <RHFFormItem
-                  name="hourly_rate"
-                  control={control}
-                  label="Hourly Rate ($)"
-                  description="Price per hour in USD"
-                >
-                  <Input
-                    placeholder="25"
-                    type="number"
-                    min="0"
-                    size="large"
-                    className="rounded-lg"
                   />
                 </RHFFormItem>
               </div>
@@ -1065,14 +1305,171 @@ export default function EditTeacherPage() {
                     </div>
                   )}
                 </div>
+
+                {/* ============ Certificates Upload Section ============ */}
+                <div className="mt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FileText className="w-5 h-5 text-[#02AAA0]" />
+                    <h4 className="text-base font-semibold text-gray-900">
+                      Teacher Certificates (PDF/Images)
+                    </h4>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Upload certificates, diplomas, or qualifications. You can
+                    select multiple files at once.
+                  </p>
+
+                  <div className="flex flex-col gap-4">
+                    {/* Hidden File Input */}
+                    <input
+                      type="file"
+                      id="certificates-upload"
+                      multiple
+                      accept="application/pdf,image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (files.length > 0 && !certificatesLoading) {
+                          handleMultipleCertificatesUpload(files);
+                        }
+                        e.target.value = "";
+                      }}
+                      disabled={certificatesLoading}
+                    />
+
+                    {/* Custom Upload Button */}
+                    <Button
+                      icon={<UploadIcon size={16} />}
+                      loading={certificatesLoading}
+                      size="large"
+                      className="w-full rounded-lg"
+                      disabled={certificatesLoading}
+                      onClick={() => {
+                        if (!certificatesLoading) {
+                          document
+                            .getElementById("certificates-upload")
+                            ?.click();
+                        }
+                      }}
+                    >
+                      {certificatesLoading
+                        ? "Uploading..."
+                        : "Upload Certificates (PDF/Images)"}
+                    </Button>
+
+                    {/* Loading Indicator */}
+                    {certificatesLoading && (
+                      <div className="flex items-center justify-center gap-2 py-3 bg-teal-50 rounded-lg border border-teal-200">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#02AAA0] border-t-transparent"></div>
+                        <span className="text-sm text-teal-700 font-medium">
+                          Uploading files, please wait...
+                        </span>
+                      </div>
+                    )}
+
+                    {/* ✅ Debug: Show count */}
+                    <p className="text-xs text-gray-400">
+                      Debug: {uploadedCertificates.length} certificates loaded
+                    </p>
+
+                    {/* Uploaded Certificates List */}
+                    {uploadedCertificates.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <FileText size={16} className="text-[#02AAA0]" />
+                          Uploaded Certificates ({uploadedCertificates.length})
+                        </p>
+                        <div className="space-y-2">
+                          {uploadedCertificates.map((file, index) => {
+                            const isPdf =
+                              file.type === "application/pdf" ||
+                              file.url?.toLowerCase().includes(".pdf");
+
+                            return (
+                              <div
+                                key={`cert-${index}-${file.url}`}
+                                className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white rounded-lg border border-gray-200 hover:border-[#02AAA0] transition-all duration-200 shadow-sm hover:shadow-md"
+                              >
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  {isPdf ? (
+                                    <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                      <FileText
+                                        size={20}
+                                        className="text-red-600"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-gray-200">
+                                      <img
+                                        src={file.url}
+                                        alt={file.name}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.target.style.display = "none";
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                      {file.name}
+                                    </p>
+                                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                      {isPdf ? (
+                                        <>
+                                          <FileText size={12} />
+                                          PDF Document
+                                        </>
+                                      ) : (
+                                        <>
+                                          <ImageIcon size={12} />
+                                          Image File
+                                        </>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeCertificate(index)}
+                                  className="ml-3 text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors duration-200 flex-shrink-0"
+                                  title="Remove certificate"
+                                  disabled={certificatesLoading}
+                                >
+                                  <X size={18} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty State */}
+                    {uploadedCertificates.length === 0 &&
+                      !certificatesLoading && (
+                        <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-sm text-gray-600 font-medium">
+                            No certificates uploaded yet
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Upload certificates to showcase teacher
+                            qualifications
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Submit Button */}
             <div className="flex items-center justify-end gap-4 pt-6 border-t border-gray-200">
               <Button
                 onClick={() => router.push("/teachers")}
-                disabled={isPending || videoUploadLoading}
+                disabled={
+                  isPending || videoUploadLoading || certificatesLoading
+                }
                 size="large"
                 className="px-8 rounded-lg"
               >
@@ -1082,7 +1479,7 @@ export default function EditTeacherPage() {
                 type="primary"
                 htmlType="submit"
                 loading={isPending}
-                disabled={videoUploadLoading}
+                disabled={videoUploadLoading || certificatesLoading}
                 className="!bg-[#02AAA0] hover:!bg-[#029a92] px-8 rounded-lg"
                 size="large"
               >

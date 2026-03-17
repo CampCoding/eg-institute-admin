@@ -26,6 +26,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import axios from "axios";
 import { BASE_URL } from "../../utils/base_url";
 import toast from "react-hot-toast";
+import Link from "next/link";
 
 export default function StudentsPage() {
   const router = useRouter();
@@ -624,6 +625,12 @@ export default function StudentsPage() {
                                 )}
                               </button>
                             </Popconfirm>
+                            <Link
+                              className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                              href={`/students/edit/${student.id}`}
+                            >
+                              <EditOutlined />
+                            </Link>
                           </div>
                         </td>
                       </tr>

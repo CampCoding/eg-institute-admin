@@ -650,21 +650,6 @@ export default function EditTeacherPage() {
                     </Select>
                   )}
                 </RHFFormItem>
-
-                <RHFFormItem
-                  name="hourly_rate"
-                  control={control}
-                  label="Hourly Rate ($)"
-                  description="Price per hour in USD"
-                >
-                  <Input
-                    placeholder="25"
-                    type="number"
-                    min="0"
-                    size="large"
-                    className="rounded-lg"
-                  />
-                </RHFFormItem>
               </div>
 
               <div className="mt-6">

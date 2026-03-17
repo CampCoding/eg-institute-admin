@@ -448,16 +448,16 @@ const links = [
       },
     ],
   },
-  // {
-  //   id: 4,
-  //   label: "Courses",
-  //   icon: BookCopy,
-  //   href: "/courses",
-  //   children: [
-  //     { id: 1, name: "All  Courses", icon: BookCopy, href: "/courses" },
-  //     { id: 2, name: "Add Course", icon: CirclePlus, href: "/courses/add" },
-  //   ],
-  // },
+  {
+    id: 4,
+    label: "Courses",
+    icon: BookCopy,
+    href: "/courses",
+    children: [
+      { id: 1, name: "All  Courses", icon: BookCopy, href: "/courses" },
+      { id: 2, name: "Add Course", icon: CirclePlus, href: "/courses/add" },
+    ],
+  },
 
   { id: 6, label: "Reservations", icon: CalendarClock, href: "/reservations" },
 

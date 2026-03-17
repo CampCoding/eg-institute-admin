@@ -335,15 +335,6 @@ export default function AddLiveCoursePage() {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Instructor *</label>
-                  <input
-                    {...register("teacher")}
-                    className={inputClass}
-                    placeholder="Instructor name"
-                  />
-                </div>
-
-                <div>
                   <label className={labelClass}>Level *</label>
                   <select {...register("level")} className={inputClass}>
                     {LEVELS.map((l) => (

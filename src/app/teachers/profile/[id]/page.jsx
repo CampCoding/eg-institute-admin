@@ -405,7 +405,7 @@ export default function InstructorProfile() {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
               <div className="flex items-center gap-2 mb-2">
                 <Users className="w-4 h-4 text-gray-500" />
@@ -434,15 +434,6 @@ export default function InstructorProfile() {
               </div>
               <div className="mt-2">
                 <Progress value={transformedData.satisfaction} />
-              </div>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="w-4 h-4 text-gray-500" />
-                <div className="text-xs text-gray-500">Rate</div>
-              </div>
-              <div className="text-xl font-semibold text-gray-900">
-                ${transformedData.hourlyRate}/hr
               </div>
             </div>
           </div>

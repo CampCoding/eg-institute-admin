@@ -22,6 +22,8 @@ import {
   Video,
   Play,
   X,
+  FileText,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
@@ -45,24 +47,13 @@ const { Option } = Select;
 
 // ============ TIME HELPER FUNCTIONS ============
 
-/**
- * Convert string time to dayjs for TimePicker display
- * @param {string|dayjs.Dayjs|null} value - Time value
- * @returns {dayjs.Dayjs|null}
- */
 const toPickerValue = (value) => {
   if (!value) return null;
   if (dayjs.isDayjs(value)) return value;
-  // Handle string format like "14:30" or "14:30:00"
   const parsed = dayjs(value, ["HH:mm", "HH:mm:ss", "H:mm", "H:mm:ss"]);
   return parsed.isValid() ? parsed : null;
 };
 
-/**
- * Convert dayjs to string for form storage (HH:mm format)
- * @param {dayjs.Dayjs|null} dayjsValue - Dayjs time value
- * @returns {string|null}
- */
 const toTimeString = (dayjsValue) => {
   if (!dayjsValue) return null;
   if (dayjs.isDayjs(dayjsValue)) {
@@ -71,22 +62,15 @@ const toTimeString = (dayjsValue) => {
   return dayjsValue;
 };
 
-/**
- * Format time for API submission (HH:mm:ss format)
- * @param {string|dayjs.Dayjs|null} value - Time value
- * @returns {string|null}
- */
 const formatTimeForSubmit = (value) => {
   if (!value) return null;
   if (dayjs.isDayjs(value)) {
     return value.format("HH:mm:ss");
   }
-  // If it's already a string, parse and reformat
   const parsed = dayjs(value, ["HH:mm", "HH:mm:ss", "H:mm", "H:mm:ss"]);
   if (parsed.isValid()) {
     return parsed.format("HH:mm:ss");
   }
-  // Fallback: append :00 if it's in HH:mm format
   if (typeof value === "string" && /^\d{1,2}:\d{2}$/.test(value)) {
     return `${value}:00`;
   }
@@ -228,6 +212,84 @@ function toPreview(values) {
   };
 }
 
+// ============ UPLOAD FUNCTIONS ============
+
+// Upload PDF Function (from your existing code)
+async function uploadPdf(file) {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("AccessToken") || localStorage.getItem("token")
+      : null;
+
+  if (!token) {
+    return { status: "error", message: "No authentication token found" };
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await axios.post(
+      `https://camp-coding.tech/eg_Institute/pdf_uplouder.php`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 60000,
+      }
+    );
+
+    if (response.data) {
+      return { status: "success", file_url: response.data?.file_url };
+    } else {
+      return { status: "error", message: "Failed to upload PDF" };
+    }
+  } catch (error) {
+    console.error("PDF upload error:", error);
+    return { status: "error", message: error.message };
+  }
+}
+
+// Upload Image Function (from your existing code)
+async function uploadImage(file) {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("AccessToken") || localStorage.getItem("token")
+      : null;
+
+  if (!token) {
+    throw new Error("No authentication token found");
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const response = await axios.post(
+      `https://camp-coding.tech/eg_Institute/image_uplouder.php`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 30000,
+      }
+    );
+
+    if (response.data) {
+      return response.data;
+    } else {
+      throw new Error("Failed to upload image");
+    }
+  } catch (error) {
+    console.error("Image upload error:", error);
+    throw error;
+  }
+}
+
 // ============ MAIN COMPONENT ============
 
 export default function AddTeacherPage() {
@@ -237,6 +299,11 @@ export default function AddTeacherPage() {
   const [videoUploadLoading, setVideoUploadLoading] = useState(false);
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [videoFile, setVideoFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // New state for certificates
+  const [certificatesLoading, setCertificatesLoading] = useState(false);
+  const [uploadedCertificates, setUploadedCertificates] = useState([]);
 
   // Get token from localStorage
   const token =
@@ -271,6 +338,7 @@ export default function AddTeacherPage() {
       hourly_rate: "",
       experience: "",
       teacher_slots: [],
+      teacher_certificates: "", // New field
     },
   });
 
@@ -333,7 +401,6 @@ export default function AddTeacherPage() {
       return;
     }
 
-    // Validate video file
     const isVideo = file.type.startsWith("video/");
     if (!isVideo) {
       toast.error("You can only upload video files!");
@@ -362,7 +429,7 @@ export default function AddTeacherPage() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
-          timeout: 300000, // 5 minutes for video upload
+          timeout: 300000,
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total
@@ -393,6 +460,92 @@ export default function AddTeacherPage() {
   const clearVideo = () => {
     setValue("video", "");
     setVideoFile(null);
+  };
+
+  // ============ NEW: Handle Certificates Upload ============
+  const handleCertificateUpload = async (file) => {
+    if (!token) {
+      toast.error("Authentication token not found. Please login again.");
+      return;
+    }
+
+    // Validate file type
+    const isPDF = file.type === "application/pdf";
+    const isImage = file.type.startsWith("image/");
+
+    if (!isPDF && !isImage) {
+      toast.error("You can only upload PDF or image files!");
+      return;
+    }
+
+    const isLt10M = file.size / 1024 / 1024 < 10;
+    if (!isLt10M) {
+      toast.error("File must be smaller than 10MB!");
+      return;
+    }
+
+    setCertificatesLoading(true);
+
+    try {
+      let fileUrl;
+
+      if (isPDF) {
+        const res = await uploadPdf(file);
+        if (res.status === "success") {
+          fileUrl = res.file_url;
+        } else {
+          toast.error(res.message || "Failed to upload PDF");
+          setCertificatesLoading(false);
+          return;
+        }
+      } else {
+        fileUrl = await uploadImage(file);
+      }
+
+      if (fileUrl) {
+        const currentCertificates = watch("teacher_certificates");
+        const certificatesArray = currentCertificates
+          ? currentCertificates.split("**").filter(Boolean)
+          : [];
+        certificatesArray.push(fileUrl);
+
+        setValue("teacher_certificates", certificatesArray.join("**"));
+        setUploadedCertificates((prev) => [
+          ...prev,
+          {
+            url: fileUrl,
+            name: file.name,
+            type: file.type,
+          },
+        ]);
+
+        toast.success(
+          `${isPDF ? "Certificate PDF" : "Certificate Image"} uploaded successfully!`
+        );
+      }
+    } catch (error) {
+      console.error("Error uploading certificate:", error);
+      toast.error("Failed to upload certificate. Please try again.");
+    } finally {
+      setCertificatesLoading(false);
+    }
+  };
+
+  // Remove certificate
+  const removeCertificate = (index) => {
+    const currentCertificates = watch("teacher_certificates")
+      .split("**")
+      .filter(Boolean);
+    currentCertificates.splice(index, 1);
+    setValue("teacher_certificates", currentCertificates.join("**"));
+
+    setUploadedCertificates((prev) => {
+      const newCertificates = [...prev];
+      newCertificates.splice(index, 1);
+      return newCertificates;
+    });
+
+    toast.success("Certificate removed");
   };
 
   // Form submit handler
@@ -426,7 +579,13 @@ export default function AddTeacherPage() {
         }
       }
 
-      // Build payload with formatted time slots
+      // تحويل الشهادات من string إلى array
+      const certificatesString = values.teacher_certificates || "";
+      const certificatesArray = certificatesString
+        ? certificatesString.split("**").filter(Boolean)
+        : [];
+
+      // Build payload
       const payload = {
         teacher_name: values.name,
         teacher_email: values.email,
@@ -435,6 +594,8 @@ export default function AddTeacherPage() {
         experience_hours: String(values.experience || "0"),
         teacher_image: values.photo || DEFAULT_PHOTO,
         video: values.video || "",
+        // إرسال الشهادات كـ Array
+        teacher_certificates: certificatesArray,
         specialization: values.title,
         bio: values.summary || "",
         tags: Array.isArray(values.tags)
@@ -443,10 +604,10 @@ export default function AddTeacherPage() {
         level: values.level || "Expert",
         created_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
         country: values.country || "",
+        // إرسال اللغات كـ Array (موجود بالفعل)
         languages: Array.isArray(values.Languages) ? values.Languages : [],
         teacher_slots: (values.teacher_slots || []).map((slot) => ({
           day: slot.day,
-          // API example بتاعك عايز "HH:mm" مش HH:mm:ss
           slots_from: dayjs.isDayjs(slot.slots_from)
             ? slot.slots_from.format("HH:mm")
             : slot.slots_from || null,
@@ -457,11 +618,6 @@ export default function AddTeacherPage() {
       };
 
       console.log("Submitting payload:", payload);
-      // Example output for teacher_slots:
-      // [{ day: "Monday", slots_from: "09:00:00", slots_to: "17:00:00" }]
-
-      // Remove this return statement to enable actual API call
-      // return;
 
       const response = await axios.post(
         `${BASE_URL}/teachers/add_teacher.php`,
@@ -480,6 +636,7 @@ export default function AddTeacherPage() {
       if (response.data && response.data.status === "success") {
         toast.success(response.data.message || "Teacher added successfully!");
         reset();
+        setUploadedCertificates([]); // Reset certificates state
         setTimeout(() => {
           router.push("/teachers");
         }, 1000);
@@ -506,6 +663,127 @@ export default function AddTeacherPage() {
     }
   };
 
+  const handleMultipleCertificatesUpload = async (files) => {
+    if (certificatesLoading || !token) {
+      if (!token) {
+        toast.error("Authentication token not found. Please login again.");
+      }
+      return;
+    }
+
+    // Filter and validate files
+    const validFiles = [];
+    for (const file of files) {
+      const isPDF = file.type === "application/pdf";
+      const isImage = file.type.startsWith("image/");
+
+      if (!isPDF && !isImage) {
+        toast.error(`${file.name}: Only PDF or image files allowed!`);
+        continue;
+      }
+
+      const isLt10M = file.size / 1024 / 1024 < 10;
+      if (!isLt10M) {
+        toast.error(`${file.name}: File must be smaller than 10MB!`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) return;
+
+    setCertificatesLoading(true);
+
+    try {
+      const results = [];
+
+      for (const file of validFiles) {
+        const isPDF = file.type === "application/pdf";
+
+        try {
+          let fileUrl;
+
+          if (isPDF) {
+            const res = await uploadPdf(file);
+            if (res.status === "success") {
+              fileUrl = res.file_url;
+            } else {
+              throw new Error(res.message || "Failed to upload PDF");
+            }
+          } else {
+            fileUrl = await uploadImage(file);
+          }
+
+          results.push({
+            success: true,
+            url: fileUrl,
+            name: file.name,
+            type: file.type,
+          });
+        } catch (error) {
+          results.push({
+            success: false,
+            name: file.name,
+            error: error.message,
+          });
+        }
+      }
+
+      const successfulUploads = results.filter((r) => r.success);
+      const failedUploads = results.filter((r) => !r.success);
+
+      if (successfulUploads.length > 0) {
+        // Get current certificates as string
+        const currentCertificates = getValues("teacher_certificates") || "";
+        const certificatesArray = currentCertificates
+          ? currentCertificates.split("**").filter(Boolean)
+          : [];
+
+        // Add new URLs (avoid duplicates)
+        successfulUploads.forEach((upload) => {
+          if (!certificatesArray.includes(upload.url)) {
+            certificatesArray.push(upload.url);
+          }
+        });
+
+        // Store as string with ** separator (will convert to array on submit)
+        setValue("teacher_certificates", certificatesArray.join("**"));
+
+        // Update state
+        setUploadedCertificates((prev) => {
+          const existingUrls = new Set(prev.map((f) => f.url));
+          const newFiles = successfulUploads.filter(
+            (upload) => !existingUrls.has(upload.url)
+          );
+          return [
+            ...prev,
+            ...newFiles.map((upload) => ({
+              url: upload.url,
+              name: upload.name,
+              type: upload.type,
+            })),
+          ];
+        });
+
+        toast.success(
+          `${successfulUploads.length} file(s) uploaded successfully!`
+        );
+      }
+
+      if (failedUploads.length > 0) {
+        failedUploads.forEach((f) => {
+          toast.error(`Failed to upload: ${f.name}`);
+        });
+      }
+    } catch (error) {
+      console.error("Error uploading certificates:", error);
+      toast.error("Failed to upload certificates. Please try again.");
+    } finally {
+      setCertificatesLoading(false);
+    }
+  };
+
   const imageUploadProps = {
     beforeUpload: (file) => {
       handleImageUpload(file);
@@ -521,6 +799,15 @@ export default function AddTeacherPage() {
     },
     showUploadList: false,
     accept: "video/*",
+  };
+
+  const certificatesUploadProps = {
+    beforeUpload: () => false,
+    showUploadList: false,
+    accept: "application/pdf,image/*",
+    multiple: true,
+    fileList: [], // Always empty to prevent accumulation
+    customRequest: () => {}, // Prevent default upload
   };
 
   return (
@@ -620,7 +907,7 @@ export default function AddTeacherPage() {
                 Professional Details
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <RHFFormItem
                   name="Languages"
                   control={control}
@@ -667,6 +954,7 @@ export default function AddTeacherPage() {
                       <Option value="Beginner">Beginner</Option>
                       <Option value="Intermediate">Intermediate</Option>
                       <Option value="Expert">Expert</Option>
+                      <Option value="All_Levels">All Levels</Option>
                     </Select>
                   )}
                 </RHFFormItem>
@@ -681,25 +969,9 @@ export default function AddTeacherPage() {
                     placeholder="5"
                     type="number"
                     min="0"
-                    max="50"
                     size="large"
                     className="rounded-lg"
                     onWheel={(e) => e.target.blur()}
-                  />
-                </RHFFormItem>
-
-                <RHFFormItem
-                  name="hourly_rate"
-                  control={control}
-                  label="Hourly Rate ($)"
-                  description="Price per hour in USD"
-                >
-                  <Input
-                    placeholder="25"
-                    type="number"
-                    min="0"
-                    size="large"
-                    className="rounded-lg"
                   />
                 </RHFFormItem>
               </div>
@@ -806,7 +1078,6 @@ export default function AddTeacherPage() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      {/* Day Select */}
                       <RHFFormItem
                         name={`teacher_slots.${index}.day`}
                         control={control}
@@ -831,7 +1102,6 @@ export default function AddTeacherPage() {
                         )}
                       </RHFFormItem>
 
-                      {/* Start Time - Updated with helpers */}
                       <RHFFormItem
                         name={`teacher_slots.${index}.slots_from`}
                         control={control}
@@ -856,7 +1126,6 @@ export default function AddTeacherPage() {
                         )}
                       </RHFFormItem>
 
-                      {/* End Time - Updated with helpers and validation */}
                       <RHFFormItem
                         name={`teacher_slots.${index}.slots_to`}
                         control={control}
@@ -957,15 +1226,40 @@ export default function AddTeacherPage() {
                         loading={uploadLoading}
                         size="large"
                         className="w-full rounded-lg"
+                        disabled={uploadLoading}
                       >
                         {uploadLoading ? "Uploading..." : "Upload Image"}
                       </Button>
                     </Upload>
+
+                    {/* Show uploaded image preview */}
+                    {watch("photo") && (
+                      <div className="mt-2 flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                        <img
+                          src={watch("photo")}
+                          alt="Profile"
+                          className="w-10 h-10 rounded-lg object-cover"
+                          onError={(e) => {
+                            e.target.src = DEFAULT_PHOTO;
+                          }}
+                        />
+                        <span className="text-sm text-green-700 flex-1 truncate">
+                          Image uploaded
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setValue("photo", "")}
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Video Upload Section */}
-                <div className="">
+                <div>
                   <div className="flex items-center gap-2 mb-4">
                     <Video className="w-5 h-5 text-[#02AAA0]" />
                     <h4 className="text-base font-semibold text-gray-900">
@@ -1023,7 +1317,6 @@ export default function AddTeacherPage() {
                         </Button>
                       </Upload>
 
-                      {/* Upload Progress */}
                       {videoUploadLoading && (
                         <div className="mt-3">
                           <Progress
@@ -1040,7 +1333,6 @@ export default function AddTeacherPage() {
                     </div>
                   </div>
 
-                  {/* Video Preview */}
                   {watch("video") && !videoUploadLoading && (
                     <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
                       <div className="flex items-center justify-between mb-2">
@@ -1062,6 +1354,159 @@ export default function AddTeacherPage() {
                     </div>
                   )}
                 </div>
+
+                {/* ============ Certificates Upload Section ============ */}
+                <div className="mt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FileText className="w-5 h-5 text-[#02AAA0]" />
+                    <h4 className="text-base font-semibold text-gray-900">
+                      Teacher Certificates (PDF/Images)
+                    </h4>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Upload certificates, diplomas, or qualifications. You can
+                    select multiple files at once.
+                  </p>
+
+                  <div className="flex flex-col gap-4">
+                    {/* Hidden File Input */}
+                    <input
+                      type="file"
+                      id="certificates-upload"
+                      multiple
+                      accept="application/pdf,image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (files.length > 0 && !isUploading) {
+                          handleMultipleCertificatesUpload(files);
+                        }
+                        // Reset input value to allow selecting same files again
+                        e.target.value = "";
+                      }}
+                      disabled={certificatesLoading}
+                    />
+
+                    {/* Custom Upload Button */}
+                    <Button
+                      icon={<UploadIcon size={16} />}
+                      loading={certificatesLoading}
+                      size="large"
+                      className="w-full rounded-lg"
+                      disabled={certificatesLoading}
+                      onClick={() => {
+                        if (!certificatesLoading) {
+                          document
+                            .getElementById("certificates-upload")
+                            ?.click();
+                        }
+                      }}
+                    >
+                      {certificatesLoading
+                        ? "Uploading..."
+                        : "Upload Certificates (PDF/Images)"}
+                    </Button>
+
+                    {/* Loading Indicator */}
+                    {certificatesLoading && (
+                      <div className="flex items-center justify-center gap-2 py-3 bg-teal-50 rounded-lg border border-teal-200">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#02AAA0] border-t-transparent"></div>
+                        <span className="text-sm text-teal-700 font-medium">
+                          Uploading files, please wait...
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Uploaded Certificates List */}
+                    {uploadedCertificates.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <FileText size={16} className="text-[#02AAA0]" />
+                          Uploaded Certificates ({uploadedCertificates.length})
+                        </p>
+                        <div className="space-y-2">
+                          {uploadedCertificates.map((file, index) => (
+                            <div
+                              key={`${file.url}-${index}`}
+                              className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white rounded-lg border border-gray-200 hover:border-[#02AAA0] transition-all duration-200 shadow-sm hover:shadow-md"
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                {file.type === "application/pdf" ? (
+                                  <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                    <FileText
+                                      size={20}
+                                      className="text-red-600"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-gray-200">
+                                    <img
+                                      src={file.url}
+                                      alt={file.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.target.style.display = "none";
+                                        e.target.parentElement.innerHTML = `
+                          <div class="w-full h-full bg-gray-200 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                            </svg>
+                          </div>
+                        `;
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 truncate">
+                                    {file.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                    {file.type === "application/pdf" ? (
+                                      <>
+                                        <FileText size={12} />
+                                        PDF Document
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ImageIcon size={12} />
+                                        Image File
+                                      </>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeCertificate(index)}
+                                className="ml-3 text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors duration-200 flex-shrink-0"
+                                title="Remove certificate"
+                                disabled={certificatesLoading}
+                              >
+                                <X size={18} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty State */}
+                    {uploadedCertificates.length === 0 &&
+                      !certificatesLoading && (
+                        <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-sm text-gray-600 font-medium">
+                            No certificates uploaded yet
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Upload certificates to showcase teacher
+                            qualifications
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1069,7 +1514,9 @@ export default function AddTeacherPage() {
             <div className="flex items-center justify-end gap-4 pt-6 border-t border-gray-200">
               <Button
                 onClick={() => router.push("/teachers")}
-                disabled={isSubmitting || videoUploadLoading}
+                disabled={
+                  isSubmitting || videoUploadLoading || certificatesLoading
+                }
                 size="large"
                 className="px-8 rounded-lg"
               >
@@ -1079,7 +1526,7 @@ export default function AddTeacherPage() {
                 type="primary"
                 htmlType="submit"
                 loading={isSubmitting}
-                disabled={videoUploadLoading}
+                disabled={videoUploadLoading || certificatesLoading}
                 className="!bg-[#02AAA0] hover:!bg-[#029a92] px-8 rounded-lg"
                 size="large"
               >
@@ -1100,11 +1547,9 @@ export default function AddTeacherPage() {
             </div>
 
             <article className="group relative overflow-hidden rounded-[22px] bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300">
-              {/* Soft blobs */}
               <div className="pointer-events-none absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-gradient-to-br from-[#02AAA0] via-[#48CAE4] to-[#90E0EF] blur-2xl opacity-60" />
               <div className="pointer-events-none absolute -right-10 bottom-20 h-24 w-24 rounded-full bg-gradient-to-br from-[#02AAA0] via-[#48CAE4] to-[#90E0EF] blur-2xl opacity-60" />
 
-              {/* Media */}
               <div className="relative h-56 overflow-hidden">
                 {preview.video ? (
                   <video
@@ -1131,7 +1576,6 @@ export default function AddTeacherPage() {
                   />
                 )}
 
-                {/* Video indicator */}
                 {preview.video && (
                   <div className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-black/50 text-white px-2 py-1 text-[12px] font-semibold">
                     <Play size={12} className="fill-white" />
@@ -1139,14 +1583,12 @@ export default function AddTeacherPage() {
                   </div>
                 )}
 
-                {/* Rating pill */}
                 <div className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2 py-1 text-[12px] font-semibold shadow">
                   <Star size={14} className="fill-amber-400 text-amber-400" />
                   {Number(preview.rating).toFixed(1)}
                 </div>
               </div>
 
-              {/* Body */}
               <div className="p-6">
                 <h3 className="text-xl font-semibold text-slate-900">
                   {preview.name}
@@ -1159,7 +1601,6 @@ export default function AddTeacherPage() {
                   {preview.summary}
                 </p>
 
-                {/* Tags */}
                 {preview.tags?.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {preview.tags.slice(0, 3).map((tag, i) => (
@@ -1178,7 +1619,6 @@ export default function AddTeacherPage() {
                   </div>
                 )}
 
-                {/* Meta row */}
                 <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
                   <span className="inline-flex items-center gap-2">
                     <span className="size-2 rounded-full bg-emerald-500 inline-block" />
