@@ -27,7 +27,8 @@ import axios from "axios";
 import { BASE_URL } from "../../utils/base_url";
 import toast from "react-hot-toast";
 import Link from "next/link";
-
+import {Eye} from "lucide-react";
+import StudentTeachersModal from "@/components/StudentTeachersModal/StudentTeachersModal";
 export default function StudentsPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,6 +38,8 @@ export default function StudentsPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [viewMode, setViewMode] = useState("table"); // table or grid
   const [deletingStudents, setDeletingStudents] = useState(new Set()); // Track which students are being deleted
+  const [openTeachersModal, setOpenTeachersModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
   const { data, isLoading, isError, refetch } = useGetAllStudents();
   console.log({ data, isLoading, isError });
@@ -494,7 +497,7 @@ export default function StudentsPage() {
                         Contact
                       </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">
-                        Location
+                        Teachers
                       </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">
                         Academic
@@ -565,12 +568,16 @@ export default function StudentsPage() {
                           </div>
                         </td>
                         <td className="py-4 px-4">
-                          <div className="space-y-1">
-                            <div className="text-sm font-medium text-gray-900">
-                              {student.country}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {getTimezoneDisplay(student.timezone)}
+                          <div className="flex items-center gap-2">
+                            <div
+                              onClick={() => {
+                                setSelectedStudent({ id: student.id, name: student.name });
+                                setOpenTeachersModal(true);
+                              }}
+                              className="text-sm font-medium text-center text-gray-900 cursor-pointer hover:text-teal-600 p-1.5 rounded-lg hover:bg-slate-100/80 transition-all"
+                              title="View assigned instructors"
+                            >
+                              <Eye size={18} />
                             </div>
                           </div>
                         </td>
@@ -804,6 +811,16 @@ export default function StudentsPage() {
           )}
         </div>
       </div>
+
+      <StudentTeachersModal
+        open={openTeachersModal}
+        onClose={() => {
+          setOpenTeachersModal(false);
+          setSelectedStudent(null);
+        }}
+        studentId={selectedStudent?.id}
+        studentName={selectedStudent?.name}
+      />
     </div>
   );
 }

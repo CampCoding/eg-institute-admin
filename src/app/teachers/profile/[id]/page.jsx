@@ -11,6 +11,7 @@ import {
   Star,
   Users,
   BookOpen,
+  UserPlus,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -19,15 +20,22 @@ import { setTeacher } from "../../../../utils/Store/TeacherSlice";
 import axios from "axios";
 import { BASE_URL } from "../../../../utils/base_url";
 import { message } from "antd";
+import toast from "react-hot-toast";
+import AddStudentModal from "@/components/AddStudentModal/AddStudentModal";
+import TeacherStudentsModal from "@/components/TeacherStudentsModal/TeacherStudentsModal"; // ✅ إستدعاء المودال الجديد
+import { useGetStudentTeacher } from "@/utils/Api/Hooks/useTeachesrandStuden";
 
 export default function InstructorProfile() {
   const router = useRouter();
   const { id } = useParams();
+  const {allstudentsQuery,assignStudentMutation,allStudentsForTeacherQuery  }=useGetStudentTeacher(id);
   const dispatch = useDispatch();
 
   const [teacher, setTeacherData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [openAddStudentModal, setOpenAddStudentModal] = useState(false);
+  const [openViewStudentsModal, setOpenViewStudentsModal] = useState(false); // ✅ الـ State بتاع مودال عرض الطلاب
 
   // Get token from localStorage
   const token =
@@ -131,6 +139,8 @@ export default function InstructorProfile() {
         availability: teacher.teacher_slots || [],
         courses: teacher.teacher_courses || [],
         createdAt: teacher.created_at,
+        // تأكدت هنا إننا بنخزن الـ students اللي جايين من الـ API لو متاحين
+        students: teacher.students || [], 
       }
     : null;
 
@@ -383,12 +393,30 @@ export default function InstructorProfile() {
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
+              <button
+                type="button"
+                onClick={() => setOpenAddStudentModal(true)}
+                className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-4 py-2 text-sm font-semibold rounded-xl hover:shadow-md hover:opacity-95 transition-all"
+              >
+                <UserPlus size={16} />
+                Add New Student
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setOpenViewStudentsModal(true)} // ✅ تشغيل المودال عند الضغط
+                className="inline-flex items-center justify-center gap-2 border border-teal-600 text-teal-700 bg-white px-4 py-2 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-all"
+              >
+                <Users size={16} />
+                View All Students
+              </button>
+
               <button
                 onClick={() =>
                   router.push(`/teachers/schedule/${transformedData.id}`)
                 }
-                className="px-4 py-2 rounded-xl text-white bg-[#02AAA0] hover:bg-[#029a92] transition-colors duration-200"
+                className="px-4 py-2 rounded-xl text-white bg-[#02AAA0] hover:bg-[#029a92] transition-colors duration-200 text-sm font-medium"
               >
                 Schedule
               </button>
@@ -397,7 +425,7 @@ export default function InstructorProfile() {
                   dispatch(setTeacher(teacherFromApiToForm));
                   router.push(`/teachers/edit/${transformedData.id}`);
                 }}
-                className="px-4 py-2 rounded-xl text-white bg-[#02AAA0] hover:bg-[#029a92] transition-colors duration-200"
+                className="px-4 py-2 rounded-xl text-white bg-[#02AAA0] hover:bg-[#029a92] transition-colors duration-200 text-sm font-medium"
               >
                 Edit Profile
               </button>
@@ -447,7 +475,7 @@ export default function InstructorProfile() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Courses ({transformedData.courses.length})
+                  {`Courses (${transformedData.courses.length})`}
                 </h2>
                 <button
                   onClick={() => router.push(`/courses/add`)}
@@ -482,19 +510,19 @@ export default function InstructorProfile() {
                           <div className="flex items-center gap-3 mt-2">
                             <Pill tone="info">Level: {course.level}</Pill>
                             <Pill>Duration: {course.Duration}</Pill>
-                            <Pill>{course.lessons} lessons</Pill>
+                            <Pill>{`${course.lessons} lessons`}</Pill>
                           </div>
                           <div className="flex items-center gap-4 mt-2 text-sm">
                             <span className="text-gray-600">
                               Group:{" "}
                               <span className="font-medium text-gray-900">
-                                ${course.group_price}
+                                {`$${course.group_price}`}
                               </span>
                             </span>
                             <span className="text-gray-600">
                               Private:{" "}
                               <span className="font-medium text-gray-900">
-                                ${course.private_price}
+                                {`$${course.private_price}`}
                               </span>
                             </span>
                           </div>
@@ -551,7 +579,7 @@ export default function InstructorProfile() {
                       <a
                         className="text-gray-900 hover:text-[#02AAA0] transition-colors duration-200"
                         href={`tel:${transformedData.phone}`}
-                      >
+                    >
                         {transformedData.phone}
                       </a>
                     </div>
@@ -600,8 +628,7 @@ export default function InstructorProfile() {
                         {slot.day}
                       </span>
                       <div className="text-sm text-gray-600">
-                        {slot.slots_from?.slice(0, 5)} -{" "}
-                        {slot.slots_to?.slice(0, 5)}
+                        {`${slot.slots_from?.slice(0, 5)} - ${slot.slots_to?.slice(0, 5)}`}
                       </div>
                     </div>
                   ))}
@@ -651,6 +678,27 @@ export default function InstructorProfile() {
           </div>
         </div>
       </div>
+
+      <AddStudentModal
+        open={openAddStudentModal}
+        onClose={() => setOpenAddStudentModal(false)}
+        onAdd={(selectedStudents) => {
+          selectedStudents.forEach((student) => {
+            assignStudentMutation.mutate({ teacher_id: id, studentId: student.student_id });
+          });
+          setOpenAddStudentModal(false);
+        }}
+      />
+
+      {/* ✅ إستدعاء مودال عرض الطلاب وتمرير البيانات إليه */}
+      <TeacherStudentsModal
+        open={openViewStudentsModal}
+        onClose={() => setOpenViewStudentsModal(false)}
+        teacherName={transformedData.name}
+        students={allStudentsForTeacherQuery?.data?.message || []}
+        isLoading={allStudentsForTeacherQuery?.isLoading}
+        
+      />
     </div>
   );
 }

@@ -154,22 +154,26 @@ export default function TeachersPage() {
     <div className="min-h-screen mb-20">
       <BreadCrumb title="Teachers" parent="Home" child="Teachers" />
 
-      {/* Search */}
-      <div className="mt-4">
-        <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2 ring-1 ring-slate-200">
-          <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-500">
-            <path
-              fill="currentColor"
-              d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"
+      {/* Control Actions Row (Search & Static Buttons) */}
+      <div className="mt-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+        {/* Search Input */}
+        <div className="w-full md:flex-1 max-w-md">
+          <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2.5 ring-1 ring-slate-200 shadow-sm focus-within:ring-2 focus-within:ring-teal-500 transition-all">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-500">
+              <path
+                fill="currentColor"
+                d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 5 1.5-1.5-5-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"
+              />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search teachers, tags, topics…"
+              className="bg-transparent outline-none text-sm w-full placeholder:text-slate-500"
             />
-          </svg>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search teachers, tags, topics…"
-            className="bg-transparent outline-none text-sm w-full placeholder:text-slate-500"
-          />
+          </div>
         </div>
+
       </div>
 
       {/* Grid */}
